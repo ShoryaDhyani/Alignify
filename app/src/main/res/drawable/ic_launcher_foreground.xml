@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="0.5"
+        android:scaleY="0.5"
+        android:translateX="27"
+        android:translateY="27">
+        <!-- Person icon representing pose detection -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,24c6.6,0 12,5.4 12,12s-5.4,12 -12,12s-12,-5.4 -12,-12S47.4,24 54,24z"/>
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,54c-12,0 -36,6 -36,18v6h72v-6C90,60 66,54 54,54z"/>
+        <!-- Arms representing pose -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:pathData="M30,72L18,54L6,66"/>
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:pathData="M78,72L90,54L102,66"/>
+    </group>
+</vector>

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "135631564844",
+    "project_id": "alighnify",
+    "storage_bucket": "alighnify.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:135631564844:android:e7c25a0cd3b5c851f2e189",
+        "android_client_info": {
+          "package_name": "com.alignify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "135631564844-n2sm4nqjrfikecpeas0gf0au49dp1o8l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.alignify",
+            "certificate_hash": "e77b0d90e50be32793c459876ef4df8da0dd7baf"
+          }
+        },
+        {
+          "client_id": "135631564844-07m3vdbe2t64gmnncbrjedbt6mili3p7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-yZJ1Is3hmJNUE-k9LB-dp6eFYjXCV2o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "135631564844-07m3vdbe2t64gmnncbrjedbt6mili3p7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
