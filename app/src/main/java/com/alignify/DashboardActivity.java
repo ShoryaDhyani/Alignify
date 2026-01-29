@@ -8,87 +8,61 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.alignify.data.AchievementManager;
-import com.alignify.data.DailyActivity;
-import com.alignify.data.StreakManager;
-import com.alignify.data.UserRepository;
-import com.alignify.engine.CaloriesEngine;
-import com.alignify.engine.StepEngine;
 import com.alignify.service.StepCounterService;
 import com.alignify.util.StepCounterHelper;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 
 /**
- * Dashboard/Home screen with navigation drawer for profile and settings.
+ * Dashboard/Home screen showing user profile and system status.
  */
 public class DashboardActivity extends AppCompatActivity {
 
-    private static final String TAG = "DashboardActivity";
     private static final String PREFS_NAME = "AlignifyPrefs";
     private static final String KEY_LOGGED_IN = "logged_in";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_NAME = "user_name";
     private static final String KEY_USER_BMI = "user_bmi";
     private static final String KEY_USER_BMI_CATEGORY = "user_bmi_category";
+    private static final String KEY_USER_ACTIVITY = "user_activity";
     private static final String KEY_VOICE_FEEDBACK = "voice_feedback";
     private static final String KEY_TEXT_FEEDBACK = "text_feedback";
-    private static final int STEP_GOAL = 10000;
 
-    // Drawer
-    private DrawerLayout drawerLayout;
+    private TextView userName;
+    private TextView bmiValue;
+    private TextView fitnessLevel;
 
-    // Header views
-    private TextView headerGreeting;
-
-    // Drawer views
-    private TextView drawerUserName;
-    private TextView drawerUserEmail;
-    private TextView drawerAvatarInitial;
-    private TextView drawerBmiValue;
-    private TextView drawerBmiCategory;
-
-    // Quick stats
-    private TextView stepsValue;
-    private TextView caloriesValue;
-    private TextView activeMinutesValue;
-    private android.widget.ProgressBar stepProgressBar;
-
-    // Streak and achievements
-    private TextView streakValue;
-    private TextView achievementsValue;
-
-    // Feedback toggles
-    private androidx.appcompat.widget.SwitchCompat voiceToggle;
-    private androidx.appcompat.widget.SwitchCompat textToggle;
-    private androidx.appcompat.widget.SwitchCompat stepTrackingToggle;
+    private Switch voiceToggle;
+    private Switch textToggle;
     private TextView voiceStatus;
     private TextView textStatus;
 
-    // Managers
+    private Button btnStartCorrection;
+    private ImageView navExercises;
+    private ImageView navProfile;
+
     private FirebaseAuth firebaseAuth;
     private GoogleSignInClient googleSignInClient;
-    private StreakManager streakManager;
-    private AchievementManager achievementManager;
-    private CaloriesEngine caloriesEngine;
-    private StepEngine stepEngine;
-    private UserRepository userRepository;
 
-    // Step counter broadcast receiver
+    // Step counter
+    private static final String TAG = "DashboardActivity";
+    private static final int STEP_GOAL = 10000; // Daily step goal
+    private TextView stepsValue;
+    private Switch stepTrackingToggle;
+    private android.widget.ProgressBar stepProgressBar;
     private BroadcastReceiver stepUpdateReceiver;
 
     @Override
@@ -105,107 +79,96 @@ public class DashboardActivity extends AppCompatActivity {
                 .build();
         googleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Initialize managers
-        streakManager = StreakManager.getInstance(this);
-        achievementManager = AchievementManager.getInstance(this);
-        caloriesEngine = CaloriesEngine.getInstance(this);
-        stepEngine = StepEngine.getInstance(this);
-        userRepository = UserRepository.getInstance();
-
         initViews();
-        setupDrawer();
-        setupListeners();
         loadUserProfile();
+        setupListeners();
+
+        // Setup step counter
         setupStepCounter();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        // Reload profile when returning from profile edit
         loadUserProfile();
+
+        // Update step count
         updateStepCountDisplay();
+
+        // Register step update receiver
         registerStepUpdateReceiver();
-        updateStreakAndAchievements();
-        updateCaloriesAndActiveMinutes();
-        loadTodayActivityFromFirestore();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        // Unregister step update receiver
         if (stepUpdateReceiver != null) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(stepUpdateReceiver);
         }
     }
 
     private void initViews() {
-        // Drawer
-        drawerLayout = findViewById(R.id.drawerLayout);
+        userName = findViewById(R.id.userName);
+        bmiValue = findViewById(R.id.bmiValue);
+        fitnessLevel = findViewById(R.id.fitnessLevel);
 
-        // Header
-        headerGreeting = findViewById(R.id.headerGreeting);
-
-        // Drawer header views
-        drawerUserName = findViewById(R.id.drawerUserName);
-        drawerUserEmail = findViewById(R.id.drawerUserEmail);
-        drawerAvatarInitial = findViewById(R.id.drawerAvatarInitial);
-        drawerBmiValue = findViewById(R.id.drawerBmiValue);
-        drawerBmiCategory = findViewById(R.id.drawerBmiCategory);
-
-        // Quick stats
-        stepsValue = findViewById(R.id.stepsValue);
-        caloriesValue = findViewById(R.id.caloriesValue);
-        activeMinutesValue = findViewById(R.id.activeMinutesValue);
-        stepProgressBar = findViewById(R.id.stepProgressBar);
-
-        // Streak and achievements
-        streakValue = findViewById(R.id.streakValue);
-        achievementsValue = findViewById(R.id.achievementsValue);
-
-        // Feedback toggles
         voiceToggle = findViewById(R.id.voiceToggle);
         textToggle = findViewById(R.id.textToggle);
-        stepTrackingToggle = findViewById(R.id.stepTrackingToggle);
         voiceStatus = findViewById(R.id.voiceStatus);
         textStatus = findViewById(R.id.textStatus);
+
+        btnStartCorrection = findViewById(R.id.btnStartCorrection);
+        navExercises = findViewById(R.id.navExercises);
+        navProfile = findViewById(R.id.navProfile);
     }
 
-    private void setupDrawer() {
-        // Menu button opens drawer
-        findViewById(R.id.btnMenu).setOnClickListener(v -> {
-            drawerLayout.openDrawer(android.view.Gravity.START);
-        });
+    private void loadUserProfile() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // Drawer navigation items
-        findViewById(R.id.navDrawerEditProfile).setOnClickListener(v -> {
-            closeDrawerAndNavigate(() -> navigateToEditProfile());
-        });
+        // Load user data
+        String email = prefs.getString(KEY_USER_EMAIL, "User");
+        String googleName = prefs.getString(KEY_USER_NAME, "");
+        float bmi = prefs.getFloat(KEY_USER_BMI, 0f);
+        String bmiCategory = prefs.getString(KEY_USER_BMI_CATEGORY, "Normal");
+        String activity = prefs.getString(KEY_USER_ACTIVITY, "Active");
 
-        findViewById(R.id.navDrawerSettings).setOnClickListener(v -> {
-            closeDrawerAndNavigate(() -> navigateToSettings());
-        });
+        // Use Google display name if available, otherwise extract from email
+        String name;
+        if (!googleName.isEmpty()) {
+            name = googleName;
+        } else if (email.contains("@")) {
+            name = email.split("@")[0];
+            if (!name.isEmpty()) {
+                name = name.substring(0, 1).toUpperCase() + name.substring(1);
+            }
+        } else {
+            name = email;
+        }
+        userName.setText(name);
 
-        findViewById(R.id.navDrawerAchievements).setOnClickListener(v -> {
-            closeDrawerAndNavigate(() -> navigateToAchievements());
-        });
+        // Set BMI
+        if (bmi > 0) {
+            bmiValue.setText(String.format("%.1f", bmi));
+        } else {
+            bmiValue.setText("--");
+        }
 
-        findViewById(R.id.navDrawerHistory).setOnClickListener(v -> {
-            closeDrawerAndNavigate(() -> navigateToTimeline());
-        });
+        // Set fitness level
+        fitnessLevel.setText("Fitness Level: " + activity);
 
-        findViewById(R.id.navDrawerLogout).setOnClickListener(v -> {
-            drawerLayout.closeDrawers();
-            showLogoutConfirmation();
-        });
-    }
+        // Load feedback preferences
+        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
+        boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
 
-    private void closeDrawerAndNavigate(Runnable action) {
-        drawerLayout.closeDrawers();
-        drawerLayout.postDelayed(action, 250);
+        voiceToggle.setChecked(voiceEnabled);
+        textToggle.setChecked(textEnabled);
+        updateVoiceStatus(voiceEnabled);
+        updateTextStatus(textEnabled);
     }
 
     private void setupListeners() {
-        // Feedback toggles
         voiceToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             updateVoiceStatus(isChecked);
             saveFeedbackPreference(KEY_VOICE_FEEDBACK, isChecked);
@@ -216,106 +179,21 @@ public class DashboardActivity extends AppCompatActivity {
             saveFeedbackPreference(KEY_TEXT_FEEDBACK, isChecked);
         });
 
-        // Start AI Workout button
-        findViewById(R.id.btnStartCorrection).setOnClickListener(v -> navigateToExerciseSelection());
+        btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
 
-        // Card clicks
-        findViewById(R.id.stepCounterCard).setOnClickListener(v -> navigateToSteps());
-        findViewById(R.id.caloriesCard).setOnClickListener(v -> navigateToTimeline());
-        findViewById(R.id.activeMinutesCard).setOnClickListener(v -> navigateToTimeline());
-        findViewById(R.id.streakCard).setOnClickListener(v -> navigateToAchievements());
+        navExercises.setOnClickListener(v -> navigateToExerciseSelection());
 
-        // Bottom navigation
-        findViewById(R.id.navHome).setOnClickListener(v -> {
-            /* Already on home */ });
-        findViewById(R.id.navExercises).setOnClickListener(v -> navigateToExerciseSelection());
-        findViewById(R.id.navTimeline).setOnClickListener(v -> navigateToTimeline());
-        findViewById(R.id.navSteps).setOnClickListener(v -> navigateToSteps());
-    }
+        // Settings button - navigate to profile edit
+        findViewById(R.id.btnSettings).setOnClickListener(v -> navigateToEditProfile());
 
-    private void loadUserProfile() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        // Profile nav - navigate to profile edit
+        navProfile.setOnClickListener(v -> navigateToEditProfile());
 
-        String email = prefs.getString(KEY_USER_EMAIL, "user@example.com");
-        String googleName = prefs.getString(KEY_USER_NAME, "");
-        float bmi = prefs.getFloat(KEY_USER_BMI, 0f);
-        String bmiCategory = prefs.getString(KEY_USER_BMI_CATEGORY, "Normal");
+        // Logout button
+        findViewById(R.id.btnLogout).setOnClickListener(v -> showLogoutConfirmation());
 
-        // Determine display name
-        String name;
-        if (!googleName.isEmpty()) {
-            name = googleName;
-        } else if (email.contains("@")) {
-            name = email.split("@")[0];
-            if (!name.isEmpty()) {
-                name = name.substring(0, 1).toUpperCase() + name.substring(1);
-            }
-        } else {
-            name = "User";
-        }
-
-        // Update header greeting
-        if (headerGreeting != null) {
-            headerGreeting.setText("Hi, " + name + " 👋");
-        }
-
-        // Update drawer header
-        if (drawerUserName != null) {
-            drawerUserName.setText(name);
-        }
-        if (drawerUserEmail != null) {
-            drawerUserEmail.setText(email);
-        }
-        if (drawerAvatarInitial != null && !name.isEmpty()) {
-            drawerAvatarInitial.setText(String.valueOf(name.charAt(0)).toUpperCase());
-        }
-        if (drawerBmiValue != null) {
-            drawerBmiValue.setText(bmi > 0 ? String.format("%.1f", bmi) : "--");
-        }
-        if (drawerBmiCategory != null) {
-            drawerBmiCategory.setText(bmiCategory);
-            // Color based on BMI category
-            int color = R.color.correct_green; // Normal
-            if (bmiCategory.equalsIgnoreCase("Underweight") || bmiCategory.equalsIgnoreCase("Overweight")) {
-                color = R.color.warning_yellow;
-            } else if (bmiCategory.equalsIgnoreCase("Obese")) {
-                color = R.color.error_red;
-            }
-            drawerBmiCategory.setTextColor(getColor(color));
-        }
-
-        // Load feedback preferences
-        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
-        boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
-
-        if (voiceToggle != null)
-            voiceToggle.setChecked(voiceEnabled);
-        if (textToggle != null)
-            textToggle.setChecked(textEnabled);
-        updateVoiceStatus(voiceEnabled);
-        updateTextStatus(textEnabled);
-    }
-
-    // ==================== Navigation ====================
-
-    private void navigateToExerciseSelection() {
-        startActivity(new Intent(this, MainActivity.class));
-    }
-
-    private void navigateToSteps() {
-        startActivity(new Intent(this, StepActivity.class));
-    }
-
-    private void navigateToTimeline() {
-        startActivity(new Intent(this, TimelineActivity.class));
-    }
-
-    private void navigateToSettings() {
-        startActivity(new Intent(this, SettingsActivity.class));
-    }
-
-    private void navigateToAchievements() {
-        startActivity(new Intent(this, AchievementsActivity.class));
+        // Profile card tap - edit profile
+        findViewById(R.id.profileCard).setOnClickListener(v -> navigateToEditProfile());
     }
 
     private void navigateToEditProfile() {
@@ -324,13 +202,11 @@ public class DashboardActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // ==================== Logout ====================
-
     private void showLogoutConfirmation() {
         new AlertDialog.Builder(this)
-                .setTitle("Sign Out")
-                .setMessage("Are you sure you want to sign out?")
-                .setPositiveButton("Sign Out", (dialog, which) -> performLogout())
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Logout", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -347,7 +223,7 @@ public class DashboardActivity extends AppCompatActivity {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             prefs.edit().clear().apply();
 
-            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
 
             // Navigate to login
             Intent intent = new Intent(this, LoginActivity.class);
@@ -357,20 +233,14 @@ public class DashboardActivity extends AppCompatActivity {
         });
     }
 
-    // ==================== Feedback Toggles ====================
-
     private void updateVoiceStatus(boolean enabled) {
-        if (voiceStatus != null) {
-            voiceStatus.setText(enabled ? "ON" : "OFF");
-            voiceStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
-        }
+        voiceStatus.setText(enabled ? "ON" : "OFF");
+        voiceStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
     }
 
     private void updateTextStatus(boolean enabled) {
-        if (textStatus != null) {
-            textStatus.setText(enabled ? "ON" : "OFF");
-            textStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
-        }
+        textStatus.setText(enabled ? "ON" : "OFF");
+        textStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
     }
 
     private void saveFeedbackPreference(String key, boolean value) {
@@ -378,18 +248,35 @@ public class DashboardActivity extends AppCompatActivity {
         prefs.edit().putBoolean(key, value).apply();
     }
 
-    // ==================== Step Counter ====================
+    private void navigateToExerciseSelection() {
+        Intent intent = new Intent(this, MainActivity.class);
+        startActivity(intent);
+    }
 
+    // ==================== Step Counter Integration ====================
+
+    /**
+     * Sets up the step counter feature.
+     */
     private void setupStepCounter() {
+        // Initialize views (these need to be added to your layout)
+        stepsValue = findViewById(R.id.stepsValue);
+        stepTrackingToggle = findViewById(R.id.stepTrackingToggle);
+        stepProgressBar = findViewById(R.id.stepProgressBar);
+
+        // Check if step counter is available
         if (!StepCounterHelper.isStepCounterAvailable(this)) {
             Log.w(TAG, "Step counter sensor not available on this device");
-            if (stepsValue != null)
+            if (stepsValue != null) {
                 stepsValue.setText("N/A");
-            if (stepTrackingToggle != null)
+            }
+            if (stepTrackingToggle != null) {
                 stepTrackingToggle.setEnabled(false);
+            }
             return;
         }
 
+        // Load saved step tracking state
         boolean stepTrackingEnabled = StepCounterHelper.isStepTrackingEnabled(this);
 
         if (stepTrackingToggle != null) {
@@ -399,28 +286,37 @@ public class DashboardActivity extends AppCompatActivity {
                     startStepTracking();
                 } else {
                     StepCounterHelper.stopStepTracking(this);
-                    if (stepsValue != null)
+                    if (stepsValue != null) {
                         stepsValue.setText("0");
-                    if (stepProgressBar != null)
-                        stepProgressBar.setProgress(0);
+                    }
                 }
             });
         }
 
+        // If step tracking was enabled, start it
         if (stepTrackingEnabled) {
             startStepTracking();
         }
     }
 
+    /**
+     * Starts step tracking after checking/requesting permissions.
+     */
     private void startStepTracking() {
+        // Check if we have permissions
         if (!StepCounterHelper.hasAllPermissions(this)) {
+            // Request permissions
             StepCounterHelper.requestPermissions(this);
         } else {
+            // Start step tracking
             StepCounterHelper.startStepTracking(this, true);
             updateStepCountDisplay();
         }
     }
 
+    /**
+     * Registers the broadcast receiver for step updates.
+     */
     private void registerStepUpdateReceiver() {
         stepUpdateReceiver = new BroadcastReceiver() {
             @Override
@@ -428,7 +324,6 @@ public class DashboardActivity extends AppCompatActivity {
                 if (StepCounterService.ACTION_STEP_UPDATE.equals(intent.getAction())) {
                     int steps = intent.getIntExtra(StepCounterService.EXTRA_STEPS_TODAY, 0);
                     updateStepUI(steps);
-                    updateCaloriesAndActiveMinutes();
                 }
             }
         };
@@ -437,6 +332,9 @@ public class DashboardActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).registerReceiver(stepUpdateReceiver, filter);
     }
 
+    /**
+     * Updates the step count display from SharedPreferences.
+     */
     private void updateStepCountDisplay() {
         if (StepCounterHelper.isStepTrackingEnabled(this)) {
             int steps = StepCounterHelper.getStepsToday(this);
@@ -444,6 +342,9 @@ public class DashboardActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Updates the step counter UI elements.
+     */
     private void updateStepUI(int steps) {
         if (stepsValue != null) {
             stepsValue.setText(String.valueOf(steps));
@@ -479,85 +380,5 @@ public class DashboardActivity extends AppCompatActivity {
                 }
             }
         }
-    }
-
-    // ==================== Streak & Achievements ====================
-
-    private void updateStreakAndAchievements() {
-        int currentStreak = streakManager.getCurrentStreak();
-        if (streakValue != null) {
-            streakValue.setText("🔥 " + currentStreak);
-        }
-
-        int unlockedCount = achievementManager.getUnlockedCount();
-        if (achievementsValue != null) {
-            achievementsValue.setText("🏆 " + unlockedCount);
-        }
-
-        // Load from Firestore for sync
-        streakManager.loadStreakFromFirestore(new StreakManager.OnStreakUpdateListener() {
-            @Override
-            public void onStreakUpdated(int streak, boolean isNewStreak) {
-                runOnUiThread(() -> {
-                    if (streakValue != null) {
-                        streakValue.setText("🔥 " + streak);
-                    }
-                });
-            }
-        });
-    }
-
-    // ==================== Calories & Active Minutes ====================
-
-    private void updateCaloriesAndActiveMinutes() {
-        int steps = StepCounterHelper.getStepsToday(this);
-        int calories = caloriesEngine.calculateStepCalories(steps);
-        int activeMinutes = stepEngine.calculateActiveMinutes(steps);
-
-        if (caloriesValue != null) {
-            caloriesValue.setText(String.valueOf(calories));
-        }
-        if (activeMinutesValue != null) {
-            activeMinutesValue.setText(String.valueOf(activeMinutes));
-        }
-    }
-
-    // ==================== Firestore Activity Data ====================
-
-    private void loadTodayActivityFromFirestore() {
-        userRepository.getTodayActivity(activity -> {
-            runOnUiThread(() -> {
-                if (activity != null) {
-                    // Update UI with Firestore data
-                    if (stepsValue != null && activity.getSteps() > 0) {
-                        stepsValue.setText(String.valueOf(activity.getSteps()));
-                        if (stepProgressBar != null) {
-                            int progress = Math.min(100, (activity.getSteps() * 100) / STEP_GOAL);
-                            stepProgressBar.setProgress(progress);
-                        }
-                    }
-                    if (caloriesValue != null && activity.getCalories() > 0) {
-                        caloriesValue.setText(String.valueOf(activity.getCalories()));
-                    }
-                    if (activeMinutesValue != null && activity.getActiveMinutes() > 0) {
-                        activeMinutesValue.setText(String.valueOf(activity.getActiveMinutes()));
-                    }
-                    Log.d(TAG, "Loaded activity from Firestore: " + activity.getSteps() + " steps");
-                } else {
-                    Log.d(TAG, "No Firestore activity data for today");
-                }
-            });
-        });
-    }
-
-    /**
-     * Save current step data to Firestore (called periodically or on pause).
-     */
-    private void saveStepsToFirestore() {
-        int steps = StepCounterHelper.getStepsToday(this);
-        int calories = caloriesEngine.calculateStepCalories(steps);
-        float distance = (float) stepEngine.calculateDistance(steps);
-
-        userRepository.updateTodaySteps(steps, calories, distance);
     }
 }
