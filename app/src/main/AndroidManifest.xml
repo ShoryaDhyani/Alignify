@@ -29,6 +29,7 @@
         android:required="false" />
 
     <application
+        android:name=".AlignifyApplication"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
@@ -77,6 +78,42 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         
+        <!-- Workout History -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Achievements -->
+        <activity
+            android:name=".AchievementsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Progress Stats -->
+        <activity
+            android:name=".StatsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Step Tracking -->
+        <activity
+            android:name=".StepActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Activity Timeline -->
+        <activity
+            android:name=".TimelineActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Settings -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
         <!-- Step Counter Foreground Service -->
         <!-- Uses FOREGROUND_SERVICE_HEALTH for Android 14+ -->
         <service
@@ -97,6 +134,15 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+        
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".service.AlignifyMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
             
     </application>
 
