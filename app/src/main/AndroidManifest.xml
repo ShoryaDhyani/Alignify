@@ -77,6 +77,25 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         
+        <!-- Step Tracking Screen -->
+        <activity
+            android:name=".StepActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- History & Analytics Screen -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Settings Screen -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        
         <!-- Step Counter Foreground Service -->
         <!-- Uses FOREGROUND_SERVICE_HEALTH for Android 14+ -->
         <service

@@ -10,21 +10,34 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.switchmaterial.SwitchMaterial;
+
+import android.view.MenuItem;
+import android.view.View;
+
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import com.google.android.material.navigation.NavigationView;
 
 import com.alignify.service.StepCounterService;
 import com.alignify.util.StepCounterHelper;
+import com.alignify.data.DailyActivity;
+import com.alignify.data.UserRepository;
+import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 /**
  * Dashboard/Home screen showing user profile and system status.
@@ -45,14 +58,18 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView bmiValue;
     private TextView fitnessLevel;
 
-    private Switch voiceToggle;
-    private Switch textToggle;
+    private SwitchMaterial voiceToggle;
+    private SwitchMaterial textToggle;
     private TextView voiceStatus;
     private TextView textStatus;
 
     private Button btnStartCorrection;
     private ImageView navExercises;
     private ImageView navProfile;
+
+    // Navigation drawer
+    private DrawerLayout drawerLayout;
+    private NavigationView navigationView;
 
     private FirebaseAuth firebaseAuth;
     private GoogleSignInClient googleSignInClient;
@@ -61,7 +78,7 @@ public class DashboardActivity extends AppCompatActivity {
     private static final String TAG = "DashboardActivity";
     private static final int STEP_GOAL = 10000; // Daily step goal
     private TextView stepsValue;
-    private Switch stepTrackingToggle;
+    private SwitchMaterial stepTrackingToggle;
     private android.widget.ProgressBar stepProgressBar;
     private BroadcastReceiver stepUpdateReceiver;
 
@@ -98,6 +115,9 @@ public class DashboardActivity extends AppCompatActivity {
 
         // Register step update receiver
         registerStepUpdateReceiver();
+
+        // Load today's activity from Firestore
+        loadTodayActivityFromFirestore();
     }
 
     @Override
@@ -106,6 +126,45 @@ public class DashboardActivity extends AppCompatActivity {
         // Unregister step update receiver
         if (stepUpdateReceiver != null) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(stepUpdateReceiver);
+        }
+        // Sync current steps to Firestore
+        saveTodayStepsToFirestore();
+    }
+
+    /**
+     * Loads today's activity data from Firestore to display.
+     */
+    private void loadTodayActivityFromFirestore() {
+        UserRepository.getInstance().getTodayActivity(activity -> {
+            if (activity != null) {
+                runOnUiThread(() -> {
+                    // Update UI with Firestore data if higher than local
+                    int localSteps = StepCounterHelper.getStepsToday(this);
+                    int firestoreSteps = activity.getSteps();
+                    if (firestoreSteps > localSteps) {
+                        updateStepUI(firestoreSteps);
+                    }
+                    Log.d(TAG, "Loaded from Firestore: steps=" + firestoreSteps +
+                            ", calories=" + activity.getCalories() +
+                            ", activeMinutes=" + activity.getActiveMinutes());
+                });
+            }
+        });
+    }
+
+    /**
+     * Saves current step count to Firestore.
+     */
+    private void saveTodayStepsToFirestore() {
+        if (!StepCounterHelper.isStepTrackingEnabled(this))
+            return;
+
+        int steps = StepCounterHelper.getStepsToday(this);
+        if (steps > 0) {
+            int calories = (int) (steps * 0.04);
+            float distance = steps * 0.0007f;
+            UserRepository.getInstance().updateTodaySteps(steps, calories, distance);
+            Log.d(TAG, "Saved steps to Firestore: " + steps);
         }
     }
 
@@ -122,6 +181,80 @@ public class DashboardActivity extends AppCompatActivity {
         btnStartCorrection = findViewById(R.id.btnStartCorrection);
         navExercises = findViewById(R.id.navExercises);
         navProfile = findViewById(R.id.navProfile);
+
+        // Navigation drawer
+        drawerLayout = findViewById(R.id.drawerLayout);
+        navigationView = findViewById(R.id.navigationView);
+
+        // Setup hamburger menu
+        ImageView btnMenu = findViewById(R.id.btnMenu);
+        btnMenu.setOnClickListener(v -> drawerLayout.openDrawer(navigationView));
+
+        // Setup navigation item selection
+        navigationView.setNavigationItemSelectedListener(this::onNavigationItemSelected);
+
+        // Populate nav header with user data
+        populateNavHeader();
+    }
+
+    /**
+     * Populates the navigation drawer header with user profile data from
+     * Google/Firebase
+     */
+    private void populateNavHeader() {
+        View headerView = navigationView.getHeaderView(0);
+        ImageView navAvatar = headerView.findViewById(R.id.navAvatar);
+        TextView navUserName = headerView.findViewById(R.id.navUserName);
+        TextView navUserEmail = headerView.findViewById(R.id.navUserEmail);
+
+        // Get current Firebase user
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+
+        // Get Google Sign-In account for photo URL
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+
+        // Get user info from SharedPreferences
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String storedName = prefs.getString(KEY_USER_NAME, "");
+        String storedEmail = prefs.getString(KEY_USER_EMAIL, "");
+
+        // Set user name - prioritize Firebase, then Google, then stored prefs
+        String displayName = "";
+        if (firebaseUser != null && firebaseUser.getDisplayName() != null && !firebaseUser.getDisplayName().isEmpty()) {
+            displayName = firebaseUser.getDisplayName();
+        } else if (googleAccount != null && googleAccount.getDisplayName() != null) {
+            displayName = googleAccount.getDisplayName();
+        } else if (!storedName.isEmpty()) {
+            displayName = storedName;
+        }
+        navUserName.setText(displayName.isEmpty() ? "User" : displayName);
+
+        // Set email - prioritize Firebase, then stored
+        String email = "";
+        if (firebaseUser != null && firebaseUser.getEmail() != null) {
+            email = firebaseUser.getEmail();
+        } else if (!storedEmail.isEmpty()) {
+            email = storedEmail;
+        }
+        navUserEmail.setText(email);
+
+        // Load profile photo - prioritize Google account, then Firebase
+        android.net.Uri photoUrl = null;
+        if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+            photoUrl = googleAccount.getPhotoUrl();
+        } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+            photoUrl = firebaseUser.getPhotoUrl();
+        }
+
+        if (photoUrl != null) {
+            Glide.with(this)
+                    .load(photoUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .into(navAvatar);
+        } else {
+            navAvatar.setImageResource(R.drawable.ic_profile);
+        }
     }
 
     private void loadUserProfile() {
@@ -183,17 +316,37 @@ public class DashboardActivity extends AppCompatActivity {
 
         navExercises.setOnClickListener(v -> navigateToExerciseSelection());
 
-        // Settings button - navigate to profile edit
-        findViewById(R.id.btnSettings).setOnClickListener(v -> navigateToEditProfile());
-
         // Profile nav - navigate to profile edit
         navProfile.setOnClickListener(v -> navigateToEditProfile());
+    }
 
-        // Logout button
-        findViewById(R.id.btnLogout).setOnClickListener(v -> showLogoutConfirmation());
+    private boolean onNavigationItemSelected(MenuItem item) {
+        drawerLayout.closeDrawers();
+        int id = item.getItemId();
 
-        // Profile card tap - edit profile
-        findViewById(R.id.profileCard).setOnClickListener(v -> navigateToEditProfile());
+        if (id == R.id.nav_dashboard) {
+            // Already on dashboard
+            return true;
+        } else if (id == R.id.nav_steps) {
+            startActivity(new Intent(this, StepActivity.class));
+            return true;
+        } else if (id == R.id.nav_exercises) {
+            navigateToExerciseSelection();
+            return true;
+        } else if (id == R.id.nav_history) {
+            startActivity(new Intent(this, HistoryActivity.class));
+            return true;
+        } else if (id == R.id.nav_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        } else if (id == R.id.nav_profile) {
+            navigateToEditProfile();
+            return true;
+        } else if (id == R.id.nav_logout) {
+            showLogoutConfirmation();
+            return true;
+        }
+        return false;
     }
 
     private void navigateToEditProfile() {

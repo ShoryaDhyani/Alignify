@@ -31,4 +31,12 @@
     <!-- Input fields -->
     <color name="input_background">#1A1A1A</color>
     <color name="input_border">#00D9FF</color>
+    
+    <!-- Cards -->
+    <color name="card_background">#1A1A1A</color>
+    
+    <!-- Additional UI -->
+    <color name="accent_secondary">#00FF88</color>
+    <color name="divider">#333333</color>
 </resources>
+

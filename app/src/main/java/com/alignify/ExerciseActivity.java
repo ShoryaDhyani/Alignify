@@ -30,6 +30,7 @@ import com.google.mediapipe.tasks.core.Delegate;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.databinding.ActivityExerciseBinding;
+import com.alignify.data.UserRepository;
 import com.alignify.exercises.*;
 
 import java.util.Locale;
@@ -67,6 +68,10 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private static final long SPEAK_COOLDOWN_MS = 5000L; // 5 seconds between same feedback
     private int consecutiveErrorCount = 0;
     private static final int MIN_ERRORS_BEFORE_SPEAK = 3; // Speak only after 3 consecutive errors
+
+    // Session tracking for Firestore
+    private long sessionStartTime = 0L;
+    private int sessionErrors = 0;
 
     // Video picker
     private final ActivityResultLauncher<String> videoPicker = registerForActivityResult(
@@ -200,6 +205,8 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                     }
                 } else {
                     isDetecting.set(true);
+                    sessionStartTime = System.currentTimeMillis();
+                    sessionErrors = 0;
                     binding.btnToggle.setText("Stop");
                 }
             }
@@ -531,11 +538,53 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
 
         // Speak feedback for errors (optimized)
         speakFeedback(result.getFeedback(), !result.isCorrect());
+
+        // Track errors for session stats
+        if (!result.isCorrect()) {
+            sessionErrors++;
+        }
+    }
+
+    /**
+     * Saves the completed workout session to Firestore.
+     */
+    private void saveWorkoutSession() {
+        if (sessionStartTime == 0)
+            return;
+
+        int durationSeconds = (int) ((System.currentTimeMillis() - sessionStartTime) / 1000);
+        int repCount = exerciseDetector != null ? exerciseDetector.getRepCount() : 0;
+
+        // Only save if session was meaningful (at least 30 seconds or 1 rep)
+        if (durationSeconds < 30 && repCount == 0) {
+            return;
+        }
+
+        // Estimate calories burned (rough estimate based on exercise intensity)
+        int caloriesEstimate = (int) (durationSeconds * 0.15); // ~9 cal/min
+
+        // Save to workout history
+        UserRepository.getInstance().saveWorkoutSession(
+                exerciseType,
+                repCount,
+                durationSeconds,
+                sessionErrors,
+                null);
+
+        // Also update daily activity aggregates
+        UserRepository.getInstance().recordWorkoutToDaily(durationSeconds, caloriesEstimate);
+
+        Log.d(TAG, "Workout saved: " + exerciseType + ", reps=" + repCount + ", duration=" + durationSeconds + "s");
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        // Save workout if there was an active session
+        if (isDetecting.get() && sessionStartTime > 0) {
+            saveWorkoutSession();
+        }
         isDetecting.set(false);
 
         if (cameraExecutor != null) {

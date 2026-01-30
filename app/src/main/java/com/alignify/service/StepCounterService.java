@@ -21,6 +21,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.alignify.DashboardActivity;
 import com.alignify.R;
+import com.alignify.data.UserRepository;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -68,6 +69,10 @@ public class StepCounterService extends Service implements SensorEventListener {
 
     private boolean isSensorAvailable = false;
     private int stepsToday = 0;
+    private int lastSyncedSteps = 0;
+    private long lastSyncTime = 0;
+    private static final int SYNC_STEP_THRESHOLD = 100; // Sync every 100 steps
+    private static final long SYNC_TIME_THRESHOLD = 5 * 60 * 1000; // or every 5 minutes
 
     @Override
     public void onCreate() {
@@ -196,6 +201,31 @@ public class StepCounterService extends Service implements SensorEventListener {
 
         // Broadcast step update to UI
         broadcastStepUpdate(stepsToday);
+
+        // Sync to Firestore periodically (every 100 steps or 5 minutes)
+        syncToFirestoreIfNeeded(stepsToday);
+    }
+
+    /**
+     * Syncs step data to Firestore periodically to avoid excessive writes.
+     */
+    private void syncToFirestoreIfNeeded(int steps) {
+        long now = System.currentTimeMillis();
+        int stepDelta = steps - lastSyncedSteps;
+        long timeDelta = now - lastSyncTime;
+
+        if (stepDelta >= SYNC_STEP_THRESHOLD || timeDelta >= SYNC_TIME_THRESHOLD) {
+            // Calculate approximate calories (0.04 cal per step is a rough estimate)
+            int calories = (int) (steps * 0.04);
+            // Approximate distance in km (average stride ~0.7m)
+            float distance = steps * 0.0007f;
+
+            UserRepository.getInstance().updateTodaySteps(steps, calories, distance);
+
+            lastSyncedSteps = steps;
+            lastSyncTime = now;
+            Log.d(TAG, "Synced steps to Firestore: " + steps);
+        }
     }
 
     /**

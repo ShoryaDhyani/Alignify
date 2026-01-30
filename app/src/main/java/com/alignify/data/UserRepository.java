@@ -165,7 +165,311 @@ public class UserRepository {
                 });
     }
 
-    // Callback interfaces
+    // ============ Daily Activity Methods ============
+
+    private static final String COLLECTION_DAILY_ACTIVITY = "dailyActivity";
+
+    /**
+     * Save or update daily activity data (upsert).
+     */
+    public void saveDailyActivity(DailyActivity activity, OnCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(activity.getDate())
+                .set(activity.toMap(), SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Daily activity saved: " + activity.getDate());
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving daily activity", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
+    }
+
+    /**
+     * Get today's activity (cache-first for speed).
+     */
+    public void getTodayActivity(OnDailyActivityListener listener) {
+        getDailyActivity(DailyActivity.todayKey(), listener);
+    }
+
+    /**
+     * Get activity for a specific date.
+     */
+    public void getDailyActivity(String date, OnDailyActivityListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onActivityLoaded(null);
+            return;
+        }
+
+        // Try cache first for speed
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(date)
+                .get(com.google.firebase.firestore.Source.CACHE)
+                .addOnSuccessListener(document -> {
+                    if (document.exists() && document.getData() != null) {
+                        DailyActivity activity = DailyActivity.fromMap(document.getData());
+                        if (listener != null)
+                            listener.onActivityLoaded(activity);
+                    } else {
+                        // Fallback to server
+                        fetchFromServer(userDoc, date, listener);
+                    }
+                })
+                .addOnFailureListener(e -> fetchFromServer(userDoc, date, listener));
+    }
+
+    private void fetchFromServer(DocumentReference userDoc, String date, OnDailyActivityListener listener) {
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(date)
+                .get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists() && document.getData() != null) {
+                        DailyActivity activity = DailyActivity.fromMap(document.getData());
+                        if (listener != null)
+                            listener.onActivityLoaded(activity);
+                    } else {
+                        if (listener != null)
+                            listener.onActivityLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading daily activity", e);
+                    if (listener != null)
+                        listener.onActivityLoaded(null);
+                });
+    }
+
+    /**
+     * Get last N days of activity for charts (optimized batch fetch).
+     */
+    public void getWeeklyActivities(int days, OnWeeklyActivityListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onActivitiesLoaded(new java.util.ArrayList<>());
+            return;
+        }
+
+        // Calculate start date
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -(days - 1));
+        String startDate = DailyActivity.dateKey(cal.getTimeInMillis());
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .whereGreaterThanOrEqualTo("date", startDate)
+                .orderBy("date", com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .limit(days)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<DailyActivity> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                        if (doc.getData() != null) {
+                            activities.add(DailyActivity.fromMap(doc.getData()));
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading weekly activities", e);
+                    if (listener != null)
+                        listener.onActivitiesLoaded(new java.util.ArrayList<>());
+                });
+    }
+
+    /**
+     * Update today's step count (incremental or replace).
+     */
+    public void updateTodaySteps(int steps, int calories, float distance) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("date", today);
+        updates.put("steps", steps);
+        updates.put("calories", calories);
+        updates.put("distance", distance);
+        updates.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Steps updated: " + steps))
+                .addOnFailureListener(e -> Log.e(TAG, "Error updating steps", e));
+    }
+
+    /**
+     * Increment active minutes for today.
+     */
+    public void addActiveMinutes(int minutes) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .update("activeMinutes", com.google.firebase.firestore.FieldValue.increment(minutes),
+                        "timestamp", System.currentTimeMillis())
+                .addOnFailureListener(e -> {
+                    // Document might not exist, create it
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("date", today);
+                    data.put("activeMinutes", minutes);
+                    data.put("timestamp", System.currentTimeMillis());
+                    userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                            .document(today)
+                            .set(data, SetOptions.merge());
+                });
+    }
+
+    /**
+     * Record a completed workout to daily activity.
+     */
+    public void recordWorkoutToDaily(int durationSeconds, int caloriesBurned) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .update(
+                        "workoutsCount", com.google.firebase.firestore.FieldValue.increment(1),
+                        "totalWorkoutDuration", com.google.firebase.firestore.FieldValue.increment(durationSeconds),
+                        "calories", com.google.firebase.firestore.FieldValue.increment(caloriesBurned),
+                        "activeMinutes", com.google.firebase.firestore.FieldValue.increment(durationSeconds / 60),
+                        "timestamp", System.currentTimeMillis())
+                .addOnFailureListener(e -> {
+                    // Document might not exist, create it
+                    DailyActivity activity = new DailyActivity(today);
+                    activity.addWorkout(durationSeconds);
+                    activity.addCalories(caloriesBurned);
+                    activity.addActiveMinutes(durationSeconds / 60);
+                    saveDailyActivity(activity, null);
+                });
+    }
+
+    // ============ Activity Collection Methods ============
+
+    private static final String COLLECTION_ACTIVITIES = "activities";
+
+    /**
+     * Save an auto-detected or manual activity.
+     */
+    public void saveActivity(String type, String source, long startTime, long endTime,
+            int durationSeconds, float distanceKm, int calories, OnCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        Map<String, Object> activity = new HashMap<>();
+        activity.put("type", type);
+        activity.put("source", source); // "auto", "manual", "ai"
+        activity.put("startTime", startTime);
+        activity.put("endTime", endTime);
+        activity.put("duration", durationSeconds);
+        activity.put("distance", distanceKm);
+        activity.put("calories", calories);
+        activity.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .add(activity)
+                .addOnSuccessListener(docRef -> {
+                    Log.d(TAG, "Activity saved: " + type + " (" + docRef.getId() + ")");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving activity", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
+    }
+
+    /**
+     * Get activities for today.
+     */
+    public void getTodayActivities(OnActivitiesListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        long todayStart = getTodayStartMillis();
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .whereGreaterThanOrEqualTo("startTime", todayStart)
+                .orderBy("startTime", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<Map<String, Object>> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Map<String, Object> data = doc.getData();
+                        if (data != null) {
+                            data.put("id", doc.getId());
+                            activities.add(data);
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                });
+    }
+
+    /**
+     * Get activities for a date range.
+     */
+    public void getActivities(long startTime, long endTime, OnActivitiesListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .whereGreaterThanOrEqualTo("startTime", startTime)
+                .whereLessThanOrEqualTo("startTime", endTime)
+                .orderBy("startTime", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<Map<String, Object>> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Map<String, Object> data = doc.getData();
+                        if (data != null) {
+                            data.put("id", doc.getId());
+                            activities.add(data);
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                });
+    }
+
+    private long getTodayStartMillis() {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
+    // ============ Callback Interfaces ============
+
     public interface OnCompleteListener {
         void onSuccess();
 
@@ -176,5 +480,17 @@ public class UserRepository {
         void onProfileLoaded(Map<String, Object> profile);
 
         void onError(String error);
+    }
+
+    public interface OnDailyActivityListener {
+        void onActivityLoaded(DailyActivity activity);
+    }
+
+    public interface OnWeeklyActivityListener {
+        void onActivitiesLoaded(java.util.List<DailyActivity> activities);
+    }
+
+    public interface OnActivitiesListener {
+        void onActivitiesLoaded(java.util.List<Map<String, Object>> activities);
     }
 }
