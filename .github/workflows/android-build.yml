@@ -22,14 +22,16 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: 'gradle'
         
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
+        cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       
     - name: Build Debug APK
-      run: gradle assembleDebug
+      run: gradle assembleDebug --parallel --build-cache
       
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
@@ -37,7 +39,6 @@ jobs:
         name: app-debug
         path: app/build/outputs/apk/debug/app-debug.apk
 
-  # Create release when a version tag is pushed (e.g., v1.0.0)
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -54,13 +55,13 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: 'gradle'
         
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
 
-    # Build signed release if keystore secrets are configured
     - name: Check for signing secrets
       id: check_secrets
       run: |
@@ -82,12 +83,11 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      run: gradle assembleRelease
+      run: gradle assembleRelease --parallel --build-cache
 
-    # Fall back to debug APK if no signing is configured
     - name: Build Debug APK (unsigned)
       if: steps.check_secrets.outputs.has_signing != 'true'
-      run: gradle assembleDebug
+      run: gradle assembleDebug --parallel --build-cache
       
     - name: Get version from tag
       id: get_version
