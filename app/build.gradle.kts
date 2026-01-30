@@ -4,7 +4,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+
 android {
+
     namespace = "com.alignify"
     compileSdk = 34
 
@@ -14,34 +16,49 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        // Release signing config - only when environment variables are present (CI/CD)
+        if (System.getenv("KEYSTORE_PATH") != null) {
+            create("release") {
+                storeFile = file(System.getenv("KEYSTORE_PATH"))
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Use release signing config if available, otherwise use debug
+            if (System.getenv("KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
-    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    
+
     buildFeatures {
         viewBinding = true
     }
-    
-    // TFLite model files should not be compressed
+
     androidResources {
         noCompress += listOf("tflite", "task")
     }
 }
+
 
 dependencies {
     // Core Android
