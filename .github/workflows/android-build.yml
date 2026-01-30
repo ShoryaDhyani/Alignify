@@ -36,11 +36,14 @@ jobs:
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/app-debug.apk
-        
+
+  # Create release when a version tag is pushed (e.g., v1.0.0)
   release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
@@ -56,33 +59,62 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
+
+    # Build signed release if keystore secrets are configured
+    - name: Check for signing secrets
+      id: check_secrets
+      run: |
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "has_signing=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_signing=false" >> $GITHUB_OUTPUT
+        fi
         
     - name: Decode Keystore
-      env:
-        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      if: steps.check_secrets.outputs.has_signing == 'true'
       run: |
-        echo $KEYSTORE_BASE64 | base64 -d > ${{ github.workspace }}/release.keystore
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/release.keystore
         
-    - name: Build Release APK
+    - name: Build Signed Release APK
+      if: steps.check_secrets.outputs.has_signing == 'true'
       env:
         KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: gradle assembleRelease
+
+    # Fall back to debug APK if no signing is configured
+    - name: Build Debug APK (unsigned)
+      if: steps.check_secrets.outputs.has_signing != 'true'
+      run: gradle assembleDebug
       
     - name: Get version from tag
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+    - name: Create GitHub Release (Signed)
+      if: steps.check_secrets.outputs.has_signing == 'true'
+      uses: softprops/action-gh-release@v2
       with:
         name: Release v${{ steps.get_version.outputs.VERSION }}
         draft: false
         prerelease: false
-        files: |
-          app/build/outputs/apk/release/app-release.apk
+        files: app/build/outputs/apk/release/app-release.apk
         generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release (Debug)
+      if: steps.check_secrets.outputs.has_signing != 'true'
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Release v${{ steps.get_version.outputs.VERSION }} (Debug)
+        body: |
+          ⚠️ **This is a debug build.** To create signed releases, configure these repository secrets:
+          - `KEYSTORE_BASE64`
+          - `KEYSTORE_PASSWORD`
+          - `KEY_ALIAS`
+          - `KEY_PASSWORD`
+        draft: false
+        prerelease: true
+        files: app/build/outputs/apk/debug/app-debug.apk
+        generate_release_notes: true
