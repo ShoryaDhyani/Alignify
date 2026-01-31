@@ -4,10 +4,12 @@
     <color name="primary">#0D0D0D</color>
     <color name="primary_dark">#000000</color>
     <color name="accent">#00D9FF</color>
+    <color name="accent_10">#1A00D9FF</color>
     <color name="accent_green">#00FF88</color>
     
     <!-- Background -->
     <color name="background">#0D0D0D</color>
+    <color name="background_light">#F5F7FA</color>
     <color name="surface">#1A1A1A</color>
     <color name="surface_light">#252525</color>
     <color name="overlay_background">#CC0D0D0D</color>
@@ -21,7 +23,9 @@
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
     <color name="text_primary">#FFFFFF</color>
+    <color name="text_primary_dark">#1A1A1A</color>
     <color name="text_secondary">#888888</color>
+    <color name="text_secondary_dark">#666666</color>
     <color name="text_hint">#666666</color>
     
     <!-- Gradients -->
@@ -34,6 +38,22 @@
     
     <!-- Cards -->
     <color name="card_background">#1A1A1A</color>
+    <color name="card_background_light">#FFFFFF</color>
+    
+    <!-- Activity Screen Card Colors (modern blue/green theme) -->
+    <color name="card_lime">#C8E6C9</color>
+    <color name="card_dark">#37474F</color>
+    <color name="card_pink">#B3E5FC</color>
+    <color name="card_purple">#D1C4E9</color>
+    <color name="card_light_pink">#E8F5E9</color>
+    <color name="card_light_blue">#E3F2FD</color>
+    <color name="water_blue">#2196F3</color>
+    
+    <!-- Activity History Card Colors -->
+    <color name="card_steps">#E8F5E9</color>
+    <color name="card_calories">#FFF3E0</color>
+    <color name="card_water">#E3F2FD</color>
+    <color name="calories_orange">#FF9800</color>
     
     <!-- Additional UI -->
     <color name="accent_secondary">#00FF88</color>

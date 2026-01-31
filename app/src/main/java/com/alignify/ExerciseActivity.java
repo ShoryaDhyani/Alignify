@@ -1,6 +1,7 @@
 package com.alignify;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.media.MediaMetadataRetriever;
@@ -11,6 +12,9 @@ import android.os.Looper;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -69,9 +73,22 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private int consecutiveErrorCount = 0;
     private static final int MIN_ERRORS_BEFORE_SPEAK = 3; // Speak only after 3 consecutive errors
 
+    // Feedback preferences from settings
+    private static final String PREFS_NAME = "AlignifyPrefs";
+    private static final String KEY_VOICE_FEEDBACK = "voice_feedback";
+    private static final String KEY_TEXT_FEEDBACK = "text_feedback";
+    private boolean voiceFeedbackEnabled = true;
+    private boolean textFeedbackEnabled = true;
+
     // Session tracking for Firestore
     private long sessionStartTime = 0L;
     private int sessionErrors = 0;
+    private int totalDetections = 0;
+    private int correctDetections = 0;
+    
+    // Timer for session duration
+    private Handler timerHandler;
+    private Runnable timerRunnable;
 
     // Video picker
     private final ActivityResultLauncher<String> videoPicker = registerForActivityResult(
@@ -98,6 +115,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             exerciseType = "bicep_curl";
         isVideoMode = getIntent().getBooleanExtra(EXTRA_VIDEO_MODE, false);
 
+        loadFeedbackPreferences();
         setupTTS();
         setupExerciseDetector();
         setupUI();
@@ -105,6 +123,12 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         if (!isVideoMode) {
             setupCamera();
         }
+    }
+
+    private void loadFeedbackPreferences() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        voiceFeedbackEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
+        textFeedbackEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
     }
 
     private void setupTTS() {
@@ -118,7 +142,8 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     private void speakFeedback(String feedback, boolean isError) {
-        if (!isTtsReady || !isDetecting.get())
+        // Check if voice feedback is enabled
+        if (!voiceFeedbackEnabled || !isTtsReady || !isDetecting.get())
             return;
 
         // Only speak errors
@@ -171,50 +196,43 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     private void setupUI() {
+        // Initialize timer handler
+        timerHandler = new Handler(Looper.getMainLooper());
+        timerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isDetecting.get() && sessionStartTime > 0) {
+                    long elapsed = System.currentTimeMillis() - sessionStartTime;
+                    updateTimerDisplay(elapsed);
+                    timerHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+        
+        // Update feedback indicators based on settings
+        updateFeedbackIndicators();
+        
+        // Back button
         binding.btnBack.setOnClickListener(v -> {
-            // Ensure detection stops before finishing
             isDetecting.set(false);
             finish();
+        });
+        
+        // Settings button - opens settings bottom sheet or activity
+        binding.btnSettings.setOnClickListener(v -> {
+            showSettingsDialog();
         });
 
         binding.btnToggle.setOnClickListener(v -> {
             if (isDetecting.get()) {
-                // Stop detection
-                isDetecting.set(false);
-                binding.btnToggle.setText(isVideoMode ? "Process Video" : "Start");
-                if (isVideoMode)
-                    binding.btnToggle.setEnabled(false); // Wait for cleanup
-
-                // Reset UI if camera mode (video mode resets in finally block)
-                if (!isVideoMode) {
-                    exerciseDetector.reset();
-                    consecutiveErrorCount = 0;
-                    updateUI(new ExerciseDetector.DetectionResult(
-                            true,
-                            "Press Start to begin",
-                            0,
-                            ""));
-                }
+                stopDetection();
             } else {
-                // Start detection
-                if (isVideoMode) {
-                    if (videoUri != null) {
-                        processVideo();
-                    } else {
-                        Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    isDetecting.set(true);
-                    sessionStartTime = System.currentTimeMillis();
-                    sessionErrors = 0;
-                    binding.btnToggle.setText("Stop");
-                }
+                startDetection();
             }
         });
 
         binding.btnFlipCamera.setOnClickListener(v -> {
             if (isVideoMode) {
-                // In video mode, flip button opens video picker
                 videoPicker.launch("video/*");
             } else {
                 isFrontCamera = !isFrontCamera;
@@ -230,35 +248,123 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             }
         });
 
-        // Long press on flip button to switch to video mode
+        // Long press to switch between camera and video mode
         binding.btnFlipCamera.setOnLongClickListener(v -> {
             if (!isVideoMode) {
-                // Switch TO Video Mode
                 isVideoMode = true;
-                binding.btnFlipCamera.setText("📁");
-                Toast.makeText(this, "Video mode enabled. Tap to select video.", Toast.LENGTH_SHORT).show();
+                binding.exerciseStatusText.setText("Video mode - tap flip to select");
+                Toast.makeText(this, "Video mode enabled", Toast.LENGTH_SHORT).show();
             } else {
-                // Switch TO Camera Mode
                 isVideoMode = false;
                 videoUri = null;
-                binding.btnFlipCamera.setText("🔄"); // Reset icon
-                binding.btnToggle.setText("Start");
-
-                // Reset visibility
                 binding.cameraPreview.setVisibility(View.VISIBLE);
                 binding.videoFrameView.setVisibility(View.GONE);
-
+                binding.exerciseStatusText.setText("Ready to start");
                 setupCamera();
-                Toast.makeText(this, "Camera mode enabled.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Camera mode enabled", Toast.LENGTH_SHORT).show();
             }
             return true;
         });
 
-        updateUI(new ExerciseDetector.DetectionResult(
-                true,
-                "Press Start to begin",
-                0,
-                ""));
+        // Initial UI state
+        resetUIState();
+    }
+    
+    private void startDetection() {
+        if (isVideoMode) {
+            if (videoUri != null) {
+                processVideo();
+            } else {
+                Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } else {
+            isDetecting.set(true);
+            sessionStartTime = System.currentTimeMillis();
+            sessionErrors = 0;
+            totalDetections = 0;
+            correctDetections = 0;
+            
+            binding.btnToggle.setText("Stop");
+            binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_stop));
+            binding.exerciseStatusText.setText("Detecting...");
+            binding.progressIndicators.setVisibility(View.VISIBLE);
+            
+            // Start timer
+            timerHandler.post(timerRunnable);
+        }
+    }
+    
+    private void stopDetection() {
+        isDetecting.set(false);
+        timerHandler.removeCallbacks(timerRunnable);
+        
+        // Save workout session
+        if (sessionStartTime > 0) {
+            saveWorkoutSession();
+        }
+        
+        binding.btnToggle.setText(isVideoMode ? "Process Video" : "Start");
+        binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_play));
+        binding.exerciseStatusText.setText("Session complete");
+        
+        if (!isVideoMode) {
+            exerciseDetector.reset();
+            consecutiveErrorCount = 0;
+        }
+    }
+    
+    private void resetUIState() {
+        binding.exerciseStatusText.setText("Ready to start");
+        binding.timerText.setText("00:00");
+        binding.repCounterText.setText("0");
+        binding.feedbackText.setText("Press Start to begin");
+        binding.feedbackText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary_dark));
+        binding.feedbackIcon.setImageResource(R.drawable.ic_info);
+        binding.feedbackIcon.setImageTintList(ContextCompat.getColorStateList(this, R.color.text_secondary_dark));
+        binding.progressIndicators.setVisibility(View.GONE);
+        binding.correctionTips.setVisibility(View.GONE);
+    }
+    
+    private void updateTimerDisplay(long elapsedMs) {
+        int seconds = (int) (elapsedMs / 1000) % 60;
+        int minutes = (int) (elapsedMs / 1000) / 60;
+        binding.timerText.setText(String.format(Locale.US, "%02d:%02d", minutes, seconds));
+    }
+    
+    private void updateFeedbackIndicators() {
+        binding.voiceIndicator.setImageTintList(ContextCompat.getColorStateList(this, 
+                voiceFeedbackEnabled ? R.color.accent : R.color.text_secondary_dark));
+        binding.textIndicator.setImageTintList(ContextCompat.getColorStateList(this, 
+                textFeedbackEnabled ? R.color.accent : R.color.text_secondary_dark));
+    }
+    
+    private void showSettingsDialog() {
+        // Toggle feedback settings quickly
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Feedback Settings")
+                .setMultiChoiceItems(
+                        new String[]{"Voice Feedback", "Text Feedback"},
+                        new boolean[]{voiceFeedbackEnabled, textFeedbackEnabled},
+                        (dialog, which, isChecked) -> {
+                            if (which == 0) {
+                                voiceFeedbackEnabled = isChecked;
+                            } else {
+                                textFeedbackEnabled = isChecked;
+                            }
+                            saveFeedbackPreferences();
+                            updateFeedbackIndicators();
+                        })
+                .setPositiveButton("Done", null)
+                .show();
+    }
+    
+    private void saveFeedbackPreferences() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean(KEY_VOICE_FEEDBACK, voiceFeedbackEnabled)
+                .putBoolean(KEY_TEXT_FEEDBACK, textFeedbackEnabled)
+                .apply();
     }
 
     private void processVideo() {
@@ -266,12 +372,23 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             return;
 
         isDetecting.set(true);
+        sessionStartTime = System.currentTimeMillis();
+        sessionErrors = 0;
+        totalDetections = 0;
+        correctDetections = 0;
+        
         binding.btnToggle.setText("Stop");
-        binding.btnToggle.setEnabled(true); // Allow stopping
+        binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_stop));
+        binding.btnToggle.setEnabled(true);
+        binding.exerciseStatusText.setText("Processing video...");
+        binding.progressIndicators.setVisibility(View.VISIBLE);
 
         // Hide camera, show video frame view
         binding.cameraPreview.setVisibility(View.GONE);
         binding.videoFrameView.setVisibility(View.VISIBLE);
+        
+        // Start timer
+        timerHandler.post(timerRunnable);
 
         // Unbind camera to release resources and turn off light
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
@@ -395,8 +512,17 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 mainHandler.post(() -> {
                     if (!isFinishing()) {
                         isDetecting.set(false);
+                        timerHandler.removeCallbacks(timerRunnable);
+                        
+                        // Save workout session
+                        if (sessionStartTime > 0) {
+                            saveWorkoutSession();
+                        }
+                        
                         binding.btnToggle.setText("Process Video");
+                        binding.btnToggle.setIcon(ContextCompat.getDrawable(ExerciseActivity.this, R.drawable.ic_play));
                         binding.btnToggle.setEnabled(true);
+                        binding.exerciseStatusText.setText("Video complete");
 
                         // If user cancelled and not in video mode anymore, restore camera
                         if (!isVideoMode) {
@@ -524,19 +650,62 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private void updateUI(ExerciseDetector.DetectionResult result) {
         // Update rep counter
         if (exerciseType.equals("plank")) {
-            binding.repCounterText.setText("Hold: " + result.getRepCount() + "s");
+            binding.repCounterText.setText(String.valueOf(result.getRepCount()));
         } else {
-            binding.repCounterText.setText(getString(R.string.reps, result.getRepCount()));
+            binding.repCounterText.setText(String.valueOf(result.getRepCount()));
         }
 
-        // Update feedback
-        binding.feedbackText.setText(result.getFeedback());
-        binding.feedbackText.setTextColor(
-                ContextCompat.getColor(
-                        this,
-                        result.isCorrect() ? R.color.correct_green : R.color.error_red));
+        // Track statistics
+        totalDetections++;
+        if (result.isCorrect()) {
+            correctDetections++;
+        }
+        
+        // Update form quality progress (rolling average)
+        int formQuality = totalDetections > 0 ? (correctDetections * 100) / totalDetections : 100;
+        binding.formQualityProgress.setProgress(formQuality);
+        
+        // Session score (based on reps and form quality)
+        int repBonus = Math.min(result.getRepCount() * 5, 50); // Up to 50 points from reps
+        int sessionScore = Math.min((formQuality / 2) + repBonus, 100);
+        binding.sessionScoreProgress.setProgress(sessionScore);
 
-        // Speak feedback for errors (optimized)
+        // Update feedback icon
+        if (result.isCorrect()) {
+            binding.feedbackIcon.setImageResource(R.drawable.ic_check_circle);
+            binding.feedbackIcon.setImageTintList(ContextCompat.getColorStateList(this, R.color.correct_green));
+        } else {
+            binding.feedbackIcon.setImageResource(R.drawable.ic_error);
+            binding.feedbackIcon.setImageTintList(ContextCompat.getColorStateList(this, R.color.error_red));
+        }
+
+        // Update feedback text (only if text feedback is enabled)
+        if (textFeedbackEnabled) {
+            binding.feedbackText.setText(result.getFeedback());
+            binding.feedbackText.setTextColor(
+                    ContextCompat.getColor(
+                            this,
+                            result.isCorrect() ? R.color.correct_green : R.color.error_red));
+            binding.feedbackText.setVisibility(View.VISIBLE);
+            
+            // Show correction tips for errors
+            if (!result.isCorrect() && result.getCorrectionTip() != null && !result.getCorrectionTip().isEmpty()) {
+                binding.correctionTips.setText(result.getCorrectionTip());
+                binding.correctionTips.setVisibility(View.VISIBLE);
+            } else {
+                binding.correctionTips.setVisibility(View.GONE);
+            }
+        } else {
+            // Show minimal feedback when text is disabled
+            binding.feedbackText.setText(result.isCorrect() ? "✓" : "✗");
+            binding.feedbackText.setTextColor(
+                    ContextCompat.getColor(
+                            this,
+                            result.isCorrect() ? R.color.correct_green : R.color.error_red));
+            binding.correctionTips.setVisibility(View.GONE);
+        }
+
+        // Speak feedback for errors (respects voiceFeedbackEnabled in speakFeedback)
         speakFeedback(result.getFeedback(), !result.isCorrect());
 
         // Track errors for session stats
@@ -580,6 +749,11 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        // Stop timer
+        if (timerHandler != null && timerRunnable != null) {
+            timerHandler.removeCallbacks(timerRunnable);
+        }
 
         // Save workout if there was an active session
         if (isDetecting.get() && sessionStartTime > 0) {

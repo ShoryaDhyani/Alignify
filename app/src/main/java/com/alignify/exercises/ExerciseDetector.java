@@ -44,17 +44,23 @@ public abstract class ExerciseDetector {
         private final int repCount;
         private final String stage;
         private final List<String> errors;
+        private final String correctionTip;
 
-        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors) {
+        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors, String correctionTip) {
             this.isCorrect = isCorrect;
             this.feedback = feedback;
             this.repCount = repCount;
             this.stage = stage;
             this.errors = errors;
+            this.correctionTip = correctionTip;
+        }
+
+        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors) {
+            this(isCorrect, feedback, repCount, stage, errors, errors.isEmpty() ? "" : errors.get(0));
         }
 
         public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage) {
-            this(isCorrect, feedback, repCount, stage, new ArrayList<>());
+            this(isCorrect, feedback, repCount, stage, new ArrayList<>(), "");
         }
 
         public boolean isCorrect() {
@@ -75,6 +81,10 @@ public abstract class ExerciseDetector {
 
         public List<String> getErrors() {
             return errors;
+        }
+        
+        public String getCorrectionTip() {
+            return correctionTip;
         }
     }
 

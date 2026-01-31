@@ -21,6 +21,7 @@ import com.alignify.data.UserRepository;
 import com.alignify.engine.ActivityEngine;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.StepCounterService;
+import com.alignify.util.NavigationHelper;
 import com.alignify.util.StepCounterHelper;
 
 import java.text.NumberFormat;
@@ -61,11 +62,12 @@ public class StepActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_step);
+        setContentView(R.layout.activity_step_new);
 
         initViews();
         initEngines();
         setupListeners();
+        setupBottomNavigation();
         loadGoal();
     }
 
@@ -92,9 +94,6 @@ public class StepActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // Back button
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
         // Tracking toggle
         switchTracking.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
@@ -112,6 +111,13 @@ public class StepActivity extends AppCompatActivity {
 
         // Goal setting
         findViewById(R.id.cardGoalSetting).setOnClickListener(v -> showGoalDialog());
+    }
+
+    private void setupBottomNavigation() {
+        // Use NAV_HOME since StepActivity is accessed from Dashboard
+        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_HOME,
+                findViewById(R.id.navHome), findViewById(R.id.navExercises),
+                findViewById(R.id.navAnalytics), findViewById(R.id.navProfile));
     }
 
     private void loadGoal() {

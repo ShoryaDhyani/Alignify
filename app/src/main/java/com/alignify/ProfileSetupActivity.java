@@ -1,26 +1,53 @@
 package com.alignify;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.alignify.data.UserRepository;
+import com.bumptech.glide.Glide;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 /**
- * Profile setup screen with BMI calculator.
+ * Profile setup screen with modern UI and profile picture upload.
  * Supports both initial setup and edit mode.
  */
 public class ProfileSetupActivity extends AppCompatActivity {
@@ -34,45 +61,70 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private static final String KEY_USER_ACTIVITY = "user_activity";
     private static final String KEY_USER_BMI = "user_bmi";
     private static final String KEY_USER_BMI_CATEGORY = "user_bmi_category";
+    private static final String KEY_PROFILE_IMAGE_URL = "profile_image_url";
 
-    private EditText heightInput;
-    private EditText weightInput;
-    private EditText ageInput;
-    private Spinner genderSpinner;
-    private Spinner activitySpinner;
-
+    // Views
+    private ImageView profileImage;
+    private CardView profileImageCard;
+    private TextInputEditText etName, etHeight, etWeight, etAge;
+    private TextInputLayout tilName, tilHeight, tilWeight, tilAge;
+    private MaterialButton btnMale, btnFemale, btnOther;
+    private ChipGroup chipGroupActivity;
     private CardView bmiCard;
-    private TextView bmiValue;
-    private TextView bmiCategory;
-
-    private CardView summaryCard;
-    private TextView summaryText;
-
-    private Button btnGenerate;
-    private Button btnContinue;
+    private TextView tvBmiValue, tvBmiCategory;
+    private View bmiScaleContainer;
+    private ImageView bmiPointer;
+    private MaterialButton btnSaveProfile;
+    private ImageButton btnBack;
     private TextView pageTitle;
-    private ImageView btnBack;
 
     private boolean isEditMode = false;
+    private String selectedGender = "";
+    private String selectedActivity = "";
+    private Uri currentPhotoUri = null;
+    private String profileImageUrl = null;
 
-    // Spinner arrays for finding indices
-    private String[] genders = { "Select Gender", "Male", "Female", "Other", "Prefer not to say" };
-    private String[] activities = { "Select Activity Level", "Sedentary", "Lightly Active", "Moderately Active",
-            "Very Active" };
+    // Camera/Gallery launchers
+    private final ActivityResultLauncher<Intent> galleryLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    Uri imageUri = result.getData().getData();
+                    if (imageUri != null) {
+                        setProfileImage(imageUri);
+                        uploadProfileImage(imageUri);
+                    }
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    if (currentPhotoUri != null) {
+                        setProfileImage(currentPhotoUri);
+                        uploadProfileImage(currentPhotoUri);
+                    }
+                }
+            });
+
+    private final ActivityResultLauncher<String> cameraPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), isGranted -> {
+                if (isGranted) {
+                    openCamera();
+                } else {
+                    Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_profile_setup);
+        setContentView(R.layout.activity_profile_setup_new);
 
-        // Check if edit mode
         isEditMode = getIntent().getBooleanExtra("edit_mode", false);
 
         initViews();
-        setupSpinners();
         setupListeners();
 
-        // If edit mode, load existing data
         if (isEditMode) {
             loadExistingProfile();
             setupEditModeUI();
@@ -80,151 +132,355 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        heightInput = findViewById(R.id.heightInput);
-        weightInput = findViewById(R.id.weightInput);
-        ageInput = findViewById(R.id.ageInput);
-        genderSpinner = findViewById(R.id.genderSpinner);
-        activitySpinner = findViewById(R.id.activitySpinner);
+        profileImage = findViewById(R.id.profileImage);
+        profileImageCard = findViewById(R.id.profileImageCard);
+
+        etName = findViewById(R.id.etName);
+        etHeight = findViewById(R.id.etHeight);
+        etWeight = findViewById(R.id.etWeight);
+        etAge = findViewById(R.id.etAge);
+
+        tilName = findViewById(R.id.tilName);
+        tilHeight = findViewById(R.id.tilHeight);
+        tilWeight = findViewById(R.id.tilWeight);
+        tilAge = findViewById(R.id.tilAge);
+
+        btnMale = findViewById(R.id.btnMale);
+        btnFemale = findViewById(R.id.btnFemale);
+        btnOther = findViewById(R.id.btnOther);
+
+        chipGroupActivity = findViewById(R.id.chipGroupActivity);
 
         bmiCard = findViewById(R.id.bmiCard);
-        bmiValue = findViewById(R.id.bmiValue);
-        bmiCategory = findViewById(R.id.bmiCategory);
+        tvBmiValue = findViewById(R.id.bmiValue);
+        tvBmiCategory = findViewById(R.id.bmiCategory);
+        bmiScaleContainer = findViewById(R.id.bmiScaleContainer);
+        bmiPointer = findViewById(R.id.bmiPointer);
 
-        summaryCard = findViewById(R.id.summaryCard);
-        summaryText = findViewById(R.id.summaryText);
-
-        btnGenerate = findViewById(R.id.btnGenerate);
-        btnContinue = findViewById(R.id.btnContinue);
-
-        // Page title (may not exist in all layouts)
-        pageTitle = findViewById(R.id.pageTitle);
+        btnSaveProfile = findViewById(R.id.btnSaveProfile);
         btnBack = findViewById(R.id.btnBack);
-    }
-
-    private void setupSpinners() {
-        ArrayAdapter<String> genderAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, genders);
-        genderSpinner.setAdapter(genderAdapter);
-
-        ArrayAdapter<String> activityAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, activities);
-        activitySpinner.setAdapter(activityAdapter);
+        pageTitle = findViewById(R.id.pageTitle);
     }
 
     private void setupListeners() {
-        btnGenerate.setOnClickListener(v -> generateProfile());
-        btnContinue.setOnClickListener(v -> navigateToDashboard());
+        // Profile image click
+        profileImageCard.setOnClickListener(v -> showImagePickerDialog());
 
-        // Back button for edit mode
+        // Gender buttons
+        btnMale.setOnClickListener(v -> selectGender("Male", btnMale));
+        btnFemale.setOnClickListener(v -> selectGender("Female", btnFemale));
+        btnOther.setOnClickListener(v -> selectGender("Other", btnOther));
+
+        // Activity level chips
+        chipGroupActivity.setOnCheckedChangeListener((group, checkedId) -> {
+            Chip chip = findViewById(checkedId);
+            if (chip != null) {
+                selectedActivity = chip.getText().toString();
+            }
+        });
+
+        // BMI calculation on height/weight change
+        TextWatcher bmiWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                calculateAndUpdateBMI();
+            }
+        };
+        etHeight.addTextChangedListener(bmiWatcher);
+        etWeight.addTextChangedListener(bmiWatcher);
+
+        // Save button
+        btnSaveProfile.setOnClickListener(v -> saveProfile());
+
+        // Back button
         if (btnBack != null) {
             btnBack.setOnClickListener(v -> onBackPressed());
         }
     }
 
-    private void setupEditModeUI() {
-        // Update title if exists
-        if (pageTitle != null) {
-            pageTitle.setText("Edit Profile");
-        }
+    private void selectGender(String gender, MaterialButton selectedBtn) {
+        selectedGender = gender;
 
-        // Show back button if exists
-        if (btnBack != null) {
-            btnBack.setVisibility(View.VISIBLE);
-        }
+        // Reset all buttons
+        btnMale.setStrokeColorResource(R.color.card_dark);
+        btnFemale.setStrokeColorResource(R.color.card_dark);
+        btnOther.setStrokeColorResource(R.color.card_dark);
+        btnMale.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.card_dark));
+        btnFemale.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.card_dark));
+        btnOther.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.card_dark));
 
-        // Change button text
-        btnGenerate.setText("Update Profile");
-        btnContinue.setText("Save & Go Back");
+        // Highlight selected
+        selectedBtn.setStrokeColorResource(R.color.accent);
+        selectedBtn.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_10));
     }
 
-    private void loadExistingProfile() {
+    private void showImagePickerDialog() {
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this, R.style.BottomSheetDialogTheme);
+        View bottomSheetView = getLayoutInflater().inflate(R.layout.bottom_sheet_image_picker, null);
+        bottomSheetDialog.setContentView(bottomSheetView);
+
+        // Get views
+        ImageButton btnClose = bottomSheetView.findViewById(R.id.btnCloseImagePicker);
+        CardView cardCamera = bottomSheetView.findViewById(R.id.cardCamera);
+        CardView cardGallery = bottomSheetView.findViewById(R.id.cardGallery);
+        CardView cardRemovePhoto = bottomSheetView.findViewById(R.id.cardRemovePhoto);
+
+        // Show remove option if profile image exists
+        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
+            cardRemovePhoto.setVisibility(View.VISIBLE);
+        }
+
+        // Close button
+        btnClose.setOnClickListener(v -> bottomSheetDialog.dismiss());
+
+        // Camera option
+        cardCamera.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            checkCameraPermissionAndOpen();
+        });
+
+        // Gallery option
+        cardGallery.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            openGallery();
+        });
+
+        // Remove photo option
+        cardRemovePhoto.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            removeProfileImage();
+        });
+
+        bottomSheetDialog.show();
+    }
+
+    private void removeProfileImage() {
+        profileImageUrl = null;
+        profileImage.setImageResource(R.drawable.ic_person);
+        
+        // Remove from SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().remove(KEY_PROFILE_IMAGE_URL).apply();
+        
+        // Remove from Firestore
+        UserRepository.getInstance().updateProfileImageUrl("", new UserRepository.OnCompleteListener() {
+            @Override
+            public void onSuccess() {
+                Toast.makeText(ProfileSetupActivity.this, "Profile picture removed", Toast.LENGTH_SHORT).show();
+            }
 
-        // Load saved values
-        float height = prefs.getFloat(KEY_USER_HEIGHT, 0f);
-        float weight = prefs.getFloat(KEY_USER_WEIGHT, 0f);
-        int age = prefs.getInt(KEY_USER_AGE, 0);
-        String gender = prefs.getString(KEY_USER_GENDER, "");
-        String activity = prefs.getString(KEY_USER_ACTIVITY, "");
-        float bmi = prefs.getFloat(KEY_USER_BMI, 0f);
-        String category = prefs.getString(KEY_USER_BMI_CATEGORY, "");
+            @Override
+            public void onError(String error) {
+                Toast.makeText(ProfileSetupActivity.this, "Failed to remove picture", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
 
-        // Populate fields
-        if (height > 0) {
-            heightInput.setText(String.valueOf((int) height));
-        }
-        if (weight > 0) {
-            weightInput.setText(String.valueOf((int) weight));
-        }
-        if (age > 0) {
-            ageInput.setText(String.valueOf(age));
-        }
-
-        // Set spinner selections
-        setSpinnerSelection(genderSpinner, genders, gender);
-        setSpinnerSelection(activitySpinner, activities, activity);
-
-        // Show BMI if already calculated
-        if (bmi > 0) {
-            bmiValue.setText(String.format("%.1f", bmi));
-            bmiCategory.setText(category);
-
-            // Set category color
-            int categoryColor = getCategoryColor(category);
-            bmiCategory.setTextColor(ContextCompat.getColor(this, categoryColor));
-
-            // Show existing data
-            bmiCard.setVisibility(View.VISIBLE);
-
-            String summary = String.format("%d cm, %d kg, %d years, %s, %s",
-                    (int) height, (int) weight, age, gender, activity);
-            summaryText.setText(summary);
-            summaryCard.setVisibility(View.VISIBLE);
-            btnContinue.setVisibility(View.VISIBLE);
+    private void checkCameraPermissionAndOpen() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            openCamera();
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
         }
     }
 
-    private void setSpinnerSelection(Spinner spinner, String[] options, String value) {
-        for (int i = 0; i < options.length; i++) {
-            if (options[i].equals(value)) {
-                spinner.setSelection(i);
-                return;
+    private void openCamera() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            File photoFile = createImageFile();
+            if (photoFile != null) {
+                currentPhotoUri = FileProvider.getUriForFile(this,
+                        getPackageName() + ".provider", photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, currentPhotoUri);
+                cameraLauncher.launch(takePictureIntent);
             }
         }
     }
 
-    private int getCategoryColor(String category) {
-        switch (category) {
-            case "Underweight":
-            case "Overweight":
-                return R.color.warning_yellow;
-            case "Normal":
-                return R.color.correct_green;
-            case "Obese":
-                return R.color.error_red;
-            default:
-                return R.color.text_primary;
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        galleryLauncher.launch(intent);
+    }
+
+    private File createImageFile() {
+        try {
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            String imageFileName = "PROFILE_" + timeStamp + "_";
+            File storageDir = getCacheDir();
+            return File.createTempFile(imageFileName, ".jpg", storageDir);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
-    private void generateProfile() {
-        String heightStr = heightInput.getText().toString().trim();
-        String weightStr = weightInput.getText().toString().trim();
-        String ageStr = ageInput.getText().toString().trim();
+    private void setProfileImage(Uri uri) {
+        Glide.with(this)
+                .load(uri)
+                .circleCrop()
+                .placeholder(R.drawable.ic_person)
+                .into(profileImage);
+    }
+
+    private void uploadProfileImage(Uri imageUri) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Toast.makeText(this, "Please sign in to upload profile picture", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show loading
+        Toast.makeText(this, "Uploading profile picture...", Toast.LENGTH_SHORT).show();
+
+        // Compress image
+        try {
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+            byte[] data = baos.toByteArray();
+
+            // Upload to Firebase Storage
+            StorageReference storageRef = FirebaseStorage.getInstance().getReference();
+            StorageReference profileRef = storageRef.child("profile_images/" + user.getUid() + ".jpg");
+
+            profileRef.putBytes(data)
+                    .addOnSuccessListener(taskSnapshot -> {
+                        profileRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                            profileImageUrl = uri.toString();
+                            saveProfileImageUrl(profileImageUrl);
+                            Toast.makeText(this, "Profile picture uploaded!", Toast.LENGTH_SHORT).show();
+                        });
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void saveProfileImageUrl(String url) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
+
+        // Also save to Firestore
+        UserRepository.getInstance().updateProfileImageUrl(url, new UserRepository.OnCompleteListener() {
+            @Override
+            public void onSuccess() {}
+
+            @Override
+            public void onError(String error) {}
+        });
+    }
+
+    private void calculateAndUpdateBMI() {
+        String heightStr = etHeight.getText().toString().trim();
+        String weightStr = etWeight.getText().toString().trim();
+
+        if (TextUtils.isEmpty(heightStr) || TextUtils.isEmpty(weightStr)) {
+            bmiCard.setVisibility(View.GONE);
+            return;
+        }
+
+        try {
+            float height = Float.parseFloat(heightStr);
+            float weight = Float.parseFloat(weightStr);
+
+            if (height <= 0 || weight <= 0) {
+                bmiCard.setVisibility(View.GONE);
+                return;
+            }
+
+            float heightM = height / 100f;
+            float bmi = weight / (heightM * heightM);
+
+            // Determine category
+            String category;
+            int categoryColor;
+
+            if (bmi < 18.5f) {
+                category = "Underweight";
+                categoryColor = R.color.warning_yellow;
+            } else if (bmi < 25f) {
+                category = "Normal";
+                categoryColor = R.color.correct_green;
+            } else if (bmi < 30f) {
+                category = "Overweight";
+                categoryColor = R.color.warning_yellow;
+            } else {
+                category = "Obese";
+                categoryColor = R.color.error_red;
+            }
+
+            tvBmiValue.setText(String.format(Locale.US, "%.1f", bmi));
+            tvBmiCategory.setText(category);
+            tvBmiCategory.setTextColor(ContextCompat.getColor(this, categoryColor));
+
+            // Update BMI scale pointer position
+            updateBMIPointer(bmi);
+
+            bmiCard.setVisibility(View.VISIBLE);
+        } catch (NumberFormatException e) {
+            bmiCard.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateBMIPointer(float bmi) {
+        // Clamp BMI between 15 and 40 for visual representation
+        float clampedBmi = Math.max(15f, Math.min(40f, bmi));
+        float progress = (clampedBmi - 15f) / 25f; // 0 to 1
+
+        // Post to get the actual width after layout
+        bmiPointer.post(() -> {
+            if (bmiScaleContainer != null) {
+                int containerWidth = bmiScaleContainer.getWidth();
+                float pointerX = containerWidth * progress - (bmiPointer.getWidth() / 2f);
+                bmiPointer.setTranslationX(pointerX);
+            }
+        });
+    }
+
+    private void saveProfile() {
+        String name = etName.getText().toString().trim();
+        String heightStr = etHeight.getText().toString().trim();
+        String weightStr = etWeight.getText().toString().trim();
+        String ageStr = etAge.getText().toString().trim();
 
         // Validation
+        boolean valid = true;
+        if (TextUtils.isEmpty(name)) {
+            tilName.setError("Name is required");
+            valid = false;
+        } else {
+            tilName.setError(null);
+        }
         if (TextUtils.isEmpty(heightStr)) {
-            heightInput.setError("Height is required");
-            return;
+            tilHeight.setError("Height is required");
+            valid = false;
+        } else {
+            tilHeight.setError(null);
         }
         if (TextUtils.isEmpty(weightStr)) {
-            weightInput.setError("Weight is required");
-            return;
+            tilWeight.setError("Weight is required");
+            valid = false;
+        } else {
+            tilWeight.setError(null);
         }
         if (TextUtils.isEmpty(ageStr)) {
-            ageInput.setError("Age is required");
-            return;
+            tilAge.setError("Age is required");
+            valid = false;
+        } else {
+            tilAge.setError(null);
         }
+
+        if (!valid) return;
 
         float height = Float.parseFloat(heightStr);
         float weight = Float.parseFloat(weightStr);
@@ -234,90 +490,141 @@ public class ProfileSetupActivity extends AppCompatActivity {
         float heightM = height / 100f;
         float bmi = weight / (heightM * heightM);
 
-        // Determine category
         String category;
-        int categoryColor;
-
-        if (bmi < 18.5f) {
-            category = "Underweight";
-            categoryColor = R.color.warning_yellow;
-        } else if (bmi < 25f) {
-            category = "Normal";
-            categoryColor = R.color.correct_green;
-        } else if (bmi < 30f) {
-            category = "Overweight";
-            categoryColor = R.color.warning_yellow;
-        } else {
-            category = "Obese";
-            categoryColor = R.color.error_red;
-        }
-
-        // Update UI
-        bmiValue.setText(String.format("%.1f", bmi));
-        bmiCategory.setText(category);
-        bmiCategory.setTextColor(ContextCompat.getColor(this, categoryColor));
-
-        String gender = genderSpinner.getSelectedItemPosition() > 0
-                ? genderSpinner.getSelectedItem().toString()
-                : "Not specified";
-        String activity = activitySpinner.getSelectedItemPosition() > 0
-                ? activitySpinner.getSelectedItem().toString()
-                : "Not specified";
-
-        String summary = String.format("%s cm, %s kg, %d years, %s, %s",
-                heightStr, weightStr, age, gender, activity);
-        summaryText.setText(summary);
-
-        // Show cards
-        bmiCard.setVisibility(View.VISIBLE);
-        summaryCard.setVisibility(View.VISIBLE);
-        btnContinue.setVisibility(View.VISIBLE);
+        if (bmi < 18.5f) category = "Underweight";
+        else if (bmi < 25f) category = "Normal";
+        else if (bmi < 30f) category = "Overweight";
+        else category = "Obese";
 
         // Save to preferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String email = prefs.getString("user_email", "");
-        String name = prefs.getString("user_name", "");
 
         prefs.edit()
+                .putString("user_name", name)
                 .putFloat(KEY_USER_HEIGHT, height)
                 .putFloat(KEY_USER_WEIGHT, weight)
                 .putInt(KEY_USER_AGE, age)
-                .putString(KEY_USER_GENDER, gender)
-                .putString(KEY_USER_ACTIVITY, activity)
+                .putString(KEY_USER_GENDER, selectedGender.isEmpty() ? "Not specified" : selectedGender)
+                .putString(KEY_USER_ACTIVITY, selectedActivity.isEmpty() ? "Not specified" : selectedActivity)
                 .putFloat(KEY_USER_BMI, bmi)
                 .putString(KEY_USER_BMI_CATEGORY, category)
+                .putBoolean(KEY_PROFILE_COMPLETE, true)
                 .apply();
 
         // Save to Firestore
         UserRepository.getInstance().saveUserProfile(
-                email, name, bmi, category, activity,
-                (int) height, (int) weight, age, gender,
+                email, name, bmi, category, selectedActivity,
+                (int) height, (int) weight, age, selectedGender,
                 new UserRepository.OnCompleteListener() {
                     @Override
                     public void onSuccess() {
-                        String msg = isEditMode ? "Profile updated!" : "Profile saved to cloud!";
-                        Toast.makeText(ProfileSetupActivity.this, msg, Toast.LENGTH_SHORT).show();
+                        runOnUiThread(() -> {
+                            String msg = isEditMode ? "Profile updated!" : "Profile created!";
+                            Toast.makeText(ProfileSetupActivity.this, msg, Toast.LENGTH_SHORT).show();
+                            navigateToDashboard();
+                        });
                     }
 
                     @Override
                     public void onError(String error) {
-                        android.util.Log.e("ProfileSetup", "Cloud save failed: " + error);
+                        runOnUiThread(() -> {
+                            Toast.makeText(ProfileSetupActivity.this, 
+                                    "Saved locally. Cloud sync pending.", Toast.LENGTH_SHORT).show();
+                            navigateToDashboard();
+                        });
                     }
                 });
+    }
 
-        String msg = isEditMode ? "Profile updated!" : "Profile generated!";
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+    private void loadExistingProfile() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        String name = prefs.getString("user_name", "");
+        float height = prefs.getFloat(KEY_USER_HEIGHT, 0f);
+        float weight = prefs.getFloat(KEY_USER_WEIGHT, 0f);
+        int age = prefs.getInt(KEY_USER_AGE, 0);
+        String gender = prefs.getString(KEY_USER_GENDER, "");
+        String activity = prefs.getString(KEY_USER_ACTIVITY, "");
+        String imageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, "");
+
+        // Populate fields
+        if (!TextUtils.isEmpty(name)) etName.setText(name);
+        if (height > 0) etHeight.setText(String.valueOf((int) height));
+        if (weight > 0) etWeight.setText(String.valueOf((int) weight));
+        if (age > 0) etAge.setText(String.valueOf(age));
+
+        // Set gender selection
+        if (!TextUtils.isEmpty(gender)) {
+            switch (gender) {
+                case "Male": selectGender("Male", btnMale); break;
+                case "Female": selectGender("Female", btnFemale); break;
+                case "Other": selectGender("Other", btnOther); break;
+            }
+        }
+
+        // Set activity level
+        if (!TextUtils.isEmpty(activity)) {
+            for (int i = 0; i < chipGroupActivity.getChildCount(); i++) {
+                Chip chip = (Chip) chipGroupActivity.getChildAt(i);
+                if (chip.getText().toString().equals(activity)) {
+                    chip.setChecked(true);
+                    selectedActivity = activity;
+                    break;
+                }
+            }
+        }
+
+        // Load profile image from local cache first
+        if (!TextUtils.isEmpty(imageUrl)) {
+            profileImageUrl = imageUrl;
+            Glide.with(this)
+                    .load(imageUrl)
+                    .circleCrop()
+                    .placeholder(R.drawable.ic_person)
+                    .into(profileImage);
+        }
+        
+        // Also fetch from Firestore to ensure we have the latest
+        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
+            @Override
+            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
+                if (profileData != null && profileData.containsKey("profileImageUrl")) {
+                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
+                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
+                        profileImageUrl = firebaseImageUrl;
+                        // Update cache
+                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
+                        
+                        // Load from Firebase URL
+                        if (!isFinishing()) {
+                            Glide.with(ProfileSetupActivity.this)
+                                    .load(firebaseImageUrl)
+                                    .circleCrop()
+                                    .placeholder(R.drawable.ic_person)
+                                    .into(profileImage);
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // Silently fail, keep cached/default image
+            }
+        });
+    }
+
+    private void setupEditModeUI() {
+        if (pageTitle != null) pageTitle.setText("Edit Profile");
+        if (btnBack != null) btnBack.setVisibility(View.VISIBLE);
+        btnSaveProfile.setText("Save Changes");
     }
 
     private void navigateToDashboard() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putBoolean(KEY_PROFILE_COMPLETE, true).apply();
-
         if (isEditMode) {
-            // Just go back to dashboard
             finish();
         } else {
-            // First time setup - navigate to dashboard
             Intent intent = new Intent(this, DashboardActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);

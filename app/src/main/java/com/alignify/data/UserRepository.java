@@ -104,6 +104,34 @@ public class UserRepository {
     }
 
     /**
+     * Update user's profile image URL in Firestore.
+     */
+    public void updateProfileImageUrl(String imageUrl, OnCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        Map<String, Object> update = new HashMap<>();
+        update.put("profileImageUrl", imageUrl);
+        update.put("updatedAt", System.currentTimeMillis());
+
+        userDoc.update(update)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Profile image URL updated");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating profile image URL", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
+    }
+
+    /**
      * Load user profile from Firestore.
      */
     public void loadUserProfile(OnProfileLoadedListener listener) {

@@ -13,8 +13,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.material.switchmaterial.SwitchMaterial;
-
 import android.view.MenuItem;
 import android.view.View;
 
@@ -26,8 +24,10 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import com.alignify.service.StepCounterService;
+import com.alignify.util.NavigationHelper;
 import com.alignify.util.StepCounterHelper;
 import com.alignify.data.DailyActivity;
 import com.alignify.data.UserRepository;
@@ -51,25 +51,24 @@ public class DashboardActivity extends AppCompatActivity {
     private static final String KEY_USER_BMI = "user_bmi";
     private static final String KEY_USER_BMI_CATEGORY = "user_bmi_category";
     private static final String KEY_USER_ACTIVITY = "user_activity";
-    private static final String KEY_VOICE_FEEDBACK = "voice_feedback";
-    private static final String KEY_TEXT_FEEDBACK = "text_feedback";
+    private static final String KEY_PROFILE_IMAGE_URL = "profile_image_url";
 
     private TextView userName;
     private TextView bmiValue;
     private TextView fitnessLevel;
+    private ImageView ivProfileImage;
 
-    private SwitchMaterial voiceToggle;
-    private SwitchMaterial textToggle;
-    private TextView voiceStatus;
-    private TextView textStatus;
-
-    private Button btnStartCorrection;
-    private ImageView navExercises;
-    private ImageView navProfile;
+    private View btnStartCorrection;
 
     // Navigation drawer
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
+
+    // Bottom navigation
+    private View navHome;
+    private View navExercises;
+    private View navAnalytics;
+    private View navProfile;
 
     private FirebaseAuth firebaseAuth;
     private GoogleSignInClient googleSignInClient;
@@ -85,7 +84,7 @@ public class DashboardActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_dashboard);
+        setContentView(R.layout.activity_dashboard_new);
 
         // Initialize Firebase Auth
         firebaseAuth = FirebaseAuth.getInstance();
@@ -172,14 +171,14 @@ public class DashboardActivity extends AppCompatActivity {
         userName = findViewById(R.id.userName);
         bmiValue = findViewById(R.id.bmiValue);
         fitnessLevel = findViewById(R.id.fitnessLevel);
-
-        voiceToggle = findViewById(R.id.voiceToggle);
-        textToggle = findViewById(R.id.textToggle);
-        voiceStatus = findViewById(R.id.voiceStatus);
-        textStatus = findViewById(R.id.textStatus);
+        ivProfileImage = findViewById(R.id.ivProfileImage);
 
         btnStartCorrection = findViewById(R.id.btnStartCorrection);
+
+        // Bottom navigation
+        navHome = findViewById(R.id.navHome);
         navExercises = findViewById(R.id.navExercises);
+        navAnalytics = findViewById(R.id.navAnalytics);
         navProfile = findViewById(R.id.navProfile);
 
         // Navigation drawer
@@ -195,6 +194,10 @@ public class DashboardActivity extends AppCompatActivity {
 
         // Populate nav header with user data
         populateNavHeader();
+
+        // Setup bottom navigation with highlighting
+        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_HOME,
+                navHome, navExercises, navAnalytics, navProfile);
     }
 
     /**
@@ -217,6 +220,7 @@ public class DashboardActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String storedName = prefs.getString(KEY_USER_NAME, "");
         String storedEmail = prefs.getString(KEY_USER_EMAIL, "");
+        String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
 
         // Set user name - prioritize Firebase, then Google, then stored prefs
         String displayName = "";
@@ -238,23 +242,62 @@ public class DashboardActivity extends AppCompatActivity {
         }
         navUserEmail.setText(email);
 
-        // Load profile photo - prioritize Google account, then Firebase
-        android.net.Uri photoUrl = null;
-        if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
-            photoUrl = googleAccount.getPhotoUrl();
-        } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
-            photoUrl = firebaseUser.getPhotoUrl();
-        }
-
-        if (photoUrl != null) {
+        // Load profile photo - prioritize custom uploaded photo, then Google/Firebase account photos
+        if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
             Glide.with(this)
-                    .load(photoUrl)
+                    .load(cachedProfileImageUrl)
                     .placeholder(R.drawable.ic_profile)
                     .error(R.drawable.ic_profile)
+                    .circleCrop()
                     .into(navAvatar);
         } else {
-            navAvatar.setImageResource(R.drawable.ic_profile);
+            android.net.Uri photoUrl = null;
+            if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+                photoUrl = googleAccount.getPhotoUrl();
+            } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+                photoUrl = firebaseUser.getPhotoUrl();
+            }
+
+            if (photoUrl != null) {
+                Glide.with(this)
+                        .load(photoUrl)
+                        .placeholder(R.drawable.ic_profile)
+                        .error(R.drawable.ic_profile)
+                        .circleCrop()
+                        .into(navAvatar);
+            } else {
+                navAvatar.setImageResource(R.drawable.ic_profile);
+            }
         }
+        
+        // Also fetch from Firestore to ensure we have the latest
+        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
+            @Override
+            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
+                if (profileData != null && profileData.containsKey("profileImageUrl")) {
+                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
+                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
+                        // Update cache
+                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
+                        
+                        // Load from Firebase URL
+                        if (!isFinishing()) {
+                            Glide.with(DashboardActivity.this)
+                                    .load(firebaseImageUrl)
+                                    .placeholder(R.drawable.ic_profile)
+                                    .error(R.drawable.ic_profile)
+                                    .circleCrop()
+                                    .into(navAvatar);
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // Silently fail, keep cached/default image
+            }
+        });
     }
 
     private void loadUserProfile() {
@@ -291,33 +334,84 @@ public class DashboardActivity extends AppCompatActivity {
         // Set fitness level
         fitnessLevel.setText("Fitness Level: " + activity);
 
-        // Load feedback preferences
-        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
-        boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
+        // Load profile image
+        loadProfileImage();
+    }
 
-        voiceToggle.setChecked(voiceEnabled);
-        textToggle.setChecked(textEnabled);
-        updateVoiceStatus(voiceEnabled);
-        updateTextStatus(textEnabled);
+    private void loadProfileImage() {
+        // First, try to load from SharedPreferences (faster local cache)
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String cachedImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
+        
+        if (cachedImageUrl != null && !cachedImageUrl.isEmpty() && ivProfileImage != null) {
+            // Load cached image immediately
+            Glide.with(this)
+                    .load(cachedImageUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+        }
+        
+        // Then fetch from Firestore to ensure we have the latest
+        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
+            @Override
+            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
+                if (profileData != null && profileData.containsKey("profileImageUrl")) {
+                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
+                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
+                        // Update cache
+                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
+                        
+                        // Load from Firebase URL
+                        if (ivProfileImage != null && !isFinishing()) {
+                            Glide.with(DashboardActivity.this)
+                                    .load(firebaseImageUrl)
+                                    .placeholder(R.drawable.ic_profile)
+                                    .error(R.drawable.ic_profile)
+                                    .circleCrop()
+                                    .into(ivProfileImage);
+                        }
+                    }
+                } else {
+                    // No custom profile image, try Google/Firebase account photos
+                    loadDefaultAccountPhoto();
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // On error, try Google/Firebase account photos
+                loadDefaultAccountPhoto();
+            }
+        });
+    }
+    
+    private void loadDefaultAccountPhoto() {
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+
+        android.net.Uri photoUrl = null;
+        if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+            photoUrl = googleAccount.getPhotoUrl();
+        } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+            photoUrl = firebaseUser.getPhotoUrl();
+        }
+
+        if (photoUrl != null && ivProfileImage != null) {
+            Glide.with(this)
+                    .load(photoUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+        } else if (ivProfileImage != null) {
+            ivProfileImage.setImageResource(R.drawable.ic_profile);
+        }
     }
 
     private void setupListeners() {
-        voiceToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            updateVoiceStatus(isChecked);
-            saveFeedbackPreference(KEY_VOICE_FEEDBACK, isChecked);
-        });
-
-        textToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            updateTextStatus(isChecked);
-            saveFeedbackPreference(KEY_TEXT_FEEDBACK, isChecked);
-        });
-
         btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
-
-        navExercises.setOnClickListener(v -> navigateToExerciseSelection());
-
-        // Profile nav - navigate to profile edit
-        navProfile.setOnClickListener(v -> navigateToEditProfile());
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {
@@ -334,7 +428,7 @@ public class DashboardActivity extends AppCompatActivity {
             navigateToExerciseSelection();
             return true;
         } else if (id == R.id.nav_history) {
-            startActivity(new Intent(this, HistoryActivity.class));
+            startActivity(new Intent(this, ActivityActivity.class));
             return true;
         } else if (id == R.id.nav_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
@@ -384,21 +478,6 @@ public class DashboardActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
         });
-    }
-
-    private void updateVoiceStatus(boolean enabled) {
-        voiceStatus.setText(enabled ? "ON" : "OFF");
-        voiceStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
-    }
-
-    private void updateTextStatus(boolean enabled) {
-        textStatus.setText(enabled ? "ON" : "OFF");
-        textStatus.setTextColor(getColor(enabled ? R.color.accent : R.color.text_secondary));
-    }
-
-    private void saveFeedbackPreference(String key, boolean value) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putBoolean(key, value).apply();
     }
 
     private void navigateToExerciseSelection() {

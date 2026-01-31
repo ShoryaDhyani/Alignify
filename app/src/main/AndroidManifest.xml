@@ -23,6 +23,16 @@
     <!-- Required to start service after boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
+    <!-- Required for scheduling exact alarms (water reminders) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    
+    <!-- Profile photo permissions -->
+    <!-- For Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- For older Android versions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    
     <!-- Step counter sensor feature (optional, app works without it) -->
     <uses-feature 
         android:name="android.hardware.sensor.stepcounter" 
@@ -59,6 +69,12 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         
+        <!-- Edit Profile -->
+        <activity
+            android:name=".EditProfileActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
         <!-- Dashboard -->
         <activity
             android:name=".DashboardActivity"
@@ -83,9 +99,9 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         
-        <!-- History & Analytics Screen -->
+        <!-- Activity Screen (Redesigned History) -->
         <activity
-            android:name=".HistoryActivity"
+            android:name=".ActivityActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         
@@ -104,6 +120,17 @@
             android:exported="false"
             android:foregroundServiceType="health" />
         
+        <!-- Water Reminder Broadcast Receiver -->
+        <receiver
+            android:name=".service.WaterReminderService"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.alignify.ACTION_WATER_REMINDER" />
+                <action android:name="com.alignify.ACTION_LOG_WATER" />
+            </intent-filter>
+        </receiver>
+        
         <!-- Boot Receiver to restart step tracking after device reboot -->
         <receiver
             android:name=".receiver.BootReceiver"
@@ -116,6 +143,17 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+        
+        <!-- FileProvider for camera capture -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
             
     </application>
 
