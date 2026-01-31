@@ -42,6 +42,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    environment: myapp
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
