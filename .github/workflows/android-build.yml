@@ -35,8 +35,12 @@ jobs:
       env:
         GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       run: |
-        echo "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+        echo "$GOOGLE_SERVICES_JSON" > google-services.b64
+        base64 -d google-services.b64 > app/google-services.json
+        echo "File size:"
         ls -l app/google-services.json
+        echo "First 5 lines (masked):"
+        head -n 5 app/google-services.json | sed 's/./*/g'
         
     - name: Build Debug APK
       run: gradle assembleDebug --parallel --build-cache
@@ -75,7 +79,9 @@ jobs:
       env:
         GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       run: |
-        echo "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+        echo "$GOOGLE_SERVICES_JSON" > google-services.b64
+        base64 -d google-services.b64 > app/google-services.json
+        echo "File size:"
         ls -l app/google-services.json
 
     - name: Check for signing secrets
