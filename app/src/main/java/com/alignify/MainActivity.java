@@ -96,8 +96,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupFeedbackToggles() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
-        boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
+        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, false);
+        boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, false);
 
         voiceToggle.setChecked(voiceEnabled);
         textToggle.setChecked(textEnabled);

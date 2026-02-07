@@ -85,7 +85,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private int sessionErrors = 0;
     private int totalDetections = 0;
     private int correctDetections = 0;
-    
+
     // Timer for session duration
     private Handler timerHandler;
     private Runnable timerRunnable;
@@ -208,16 +208,16 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 }
             }
         };
-        
+
         // Update feedback indicators based on settings
         updateFeedbackIndicators();
-        
+
         // Back button
         binding.btnBack.setOnClickListener(v -> {
             isDetecting.set(false);
             finish();
         });
-        
+
         // Settings button - opens settings bottom sheet or activity
         binding.btnSettings.setOnClickListener(v -> {
             showSettingsDialog();
@@ -269,7 +269,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         // Initial UI state
         resetUIState();
     }
-    
+
     private void startDetection() {
         if (isVideoMode) {
             if (videoUri != null) {
@@ -284,36 +284,36 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             sessionErrors = 0;
             totalDetections = 0;
             correctDetections = 0;
-            
+
             binding.btnToggle.setText("Stop");
             binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_stop));
             binding.exerciseStatusText.setText("Detecting...");
             binding.progressIndicators.setVisibility(View.VISIBLE);
-            
+
             // Start timer
             timerHandler.post(timerRunnable);
         }
     }
-    
+
     private void stopDetection() {
         isDetecting.set(false);
         timerHandler.removeCallbacks(timerRunnable);
-        
+
         // Save workout session
         if (sessionStartTime > 0) {
             saveWorkoutSession();
         }
-        
+
         binding.btnToggle.setText(isVideoMode ? "Process Video" : "Start");
         binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_play));
         binding.exerciseStatusText.setText("Session complete");
-        
+
         if (!isVideoMode) {
             exerciseDetector.reset();
             consecutiveErrorCount = 0;
         }
     }
-    
+
     private void resetUIState() {
         binding.exerciseStatusText.setText("Ready to start");
         binding.timerText.setText("00:00");
@@ -325,27 +325,27 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         binding.progressIndicators.setVisibility(View.GONE);
         binding.correctionTips.setVisibility(View.GONE);
     }
-    
+
     private void updateTimerDisplay(long elapsedMs) {
         int seconds = (int) (elapsedMs / 1000) % 60;
         int minutes = (int) (elapsedMs / 1000) / 60;
         binding.timerText.setText(String.format(Locale.US, "%02d:%02d", minutes, seconds));
     }
-    
+
     private void updateFeedbackIndicators() {
-        binding.voiceIndicator.setImageTintList(ContextCompat.getColorStateList(this, 
+        binding.voiceIndicator.setImageTintList(ContextCompat.getColorStateList(this,
                 voiceFeedbackEnabled ? R.color.accent : R.color.text_secondary_dark));
-        binding.textIndicator.setImageTintList(ContextCompat.getColorStateList(this, 
+        binding.textIndicator.setImageTintList(ContextCompat.getColorStateList(this,
                 textFeedbackEnabled ? R.color.accent : R.color.text_secondary_dark));
     }
-    
+
     private void showSettingsDialog() {
         // Toggle feedback settings quickly
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Feedback Settings")
                 .setMultiChoiceItems(
-                        new String[]{"Voice Feedback", "Text Feedback"},
-                        new boolean[]{voiceFeedbackEnabled, textFeedbackEnabled},
+                        new String[] { "Voice Feedback", "Text Feedback" },
+                        new boolean[] { voiceFeedbackEnabled, textFeedbackEnabled },
                         (dialog, which, isChecked) -> {
                             if (which == 0) {
                                 voiceFeedbackEnabled = isChecked;
@@ -358,7 +358,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 .setPositiveButton("Done", null)
                 .show();
     }
-    
+
     private void saveFeedbackPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit()
@@ -376,7 +376,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         sessionErrors = 0;
         totalDetections = 0;
         correctDetections = 0;
-        
+
         binding.btnToggle.setText("Stop");
         binding.btnToggle.setIcon(ContextCompat.getDrawable(this, R.drawable.ic_stop));
         binding.btnToggle.setEnabled(true);
@@ -386,7 +386,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         // Hide camera, show video frame view
         binding.cameraPreview.setVisibility(View.GONE);
         binding.videoFrameView.setVisibility(View.VISIBLE);
-        
+
         // Start timer
         timerHandler.post(timerRunnable);
 
@@ -513,12 +513,12 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                     if (!isFinishing()) {
                         isDetecting.set(false);
                         timerHandler.removeCallbacks(timerRunnable);
-                        
+
                         // Save workout session
                         if (sessionStartTime > 0) {
                             saveWorkoutSession();
                         }
-                        
+
                         binding.btnToggle.setText("Process Video");
                         binding.btnToggle.setIcon(ContextCompat.getDrawable(ExerciseActivity.this, R.drawable.ic_play));
                         binding.btnToggle.setEnabled(true);
@@ -660,11 +660,11 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         if (result.isCorrect()) {
             correctDetections++;
         }
-        
+
         // Update form quality progress (rolling average)
         int formQuality = totalDetections > 0 ? (correctDetections * 100) / totalDetections : 100;
         binding.formQualityProgress.setProgress(formQuality);
-        
+
         // Session score (based on reps and form quality)
         int repBonus = Math.min(result.getRepCount() * 5, 50); // Up to 50 points from reps
         int sessionScore = Math.min((formQuality / 2) + repBonus, 100);
@@ -687,7 +687,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                             this,
                             result.isCorrect() ? R.color.correct_green : R.color.error_red));
             binding.feedbackText.setVisibility(View.VISIBLE);
-            
+
             // Show correction tips for errors
             if (!result.isCorrect() && result.getCorrectionTip() != null && !result.getCorrectionTip().isEmpty()) {
                 binding.correctionTips.setText(result.getCorrectionTip());

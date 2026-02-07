@@ -14,6 +14,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.alignify.data.DailyActivity;
+import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
@@ -66,6 +67,7 @@ public class ActivityActivity extends AppCompatActivity {
     private LinearLayout navProfile;
 
     // Data
+    private FitnessDataManager fitnessDataManager;
     private WaterTrackingHelper waterHelper;
     private Calendar selectedDate;
     private List<DayItem> weekDays = new ArrayList<>();
@@ -76,6 +78,8 @@ public class ActivityActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_activity);
 
+        // Initialize FitnessDataManager (single source of truth for fitness data)
+        fitnessDataManager = FitnessDataManager.getInstance(this);
         waterHelper = new WaterTrackingHelper(this);
         selectedDate = Calendar.getInstance();
 
@@ -115,14 +119,14 @@ public class ActivityActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // Water tracking
+        // Water tracking - use FitnessDataManager for consistent data
         btnAddWater.setOnClickListener(v -> {
-            waterHelper.addWaterCup();
+            fitnessDataManager.addWaterCup();
             updateWaterUI();
         });
 
         btnRemoveWater.setOnClickListener(v -> {
-            waterHelper.removeWaterCup();
+            fitnessDataManager.removeWaterCup();
             updateWaterUI();
         });
 
@@ -521,14 +525,14 @@ public class ActivityActivity extends AppCompatActivity {
         // Calories
         tvCalories.setText(activity.getCalories() + " Cal");
 
-        // Steps
-        int stepGoal = 2000; // Default step goal
+        // Steps - use FitnessDataManager for consistent step goal
+        int stepGoal = fitnessDataManager.getStepGoal();
         tvSteps.setText(activity.getSteps() + "/" + stepGoal);
 
-        // Training time (calculate percentage of goal, e.g., 60 minutes)
-        int trainingGoal = 60; // 60 minutes
+        // Training time (calculate percentage of goal from FitnessDataManager)
+        int trainingGoal = fitnessDataManager.getActiveTimeGoal();
         int activeMinutes = activity.getActiveMinutes();
-        int trainingPercent = Math.min(100, (activeMinutes * 100) / trainingGoal);
+        int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
         tvTrainingPercent.setText(trainingPercent + "%");
         progressTraining.setProgress(trainingPercent);
 
@@ -545,9 +549,10 @@ public class ActivityActivity extends AppCompatActivity {
     }
 
     private void updateWaterUI() {
-        int cups = waterHelper.getWaterCups();
-        int goal = waterHelper.getWaterGoal();
-        int progress = waterHelper.getProgressPercent();
+        // Use FitnessDataManager for water tracking (consistent with other activities)
+        int cups = fitnessDataManager.getWaterCupsToday();
+        int goal = fitnessDataManager.getWaterGoal();
+        int progress = fitnessDataManager.getWaterProgressPercent();
 
         tvWaterCups.setText(cups + "/" + goal + " Cups");
         progressWater.setProgress(progress);
@@ -585,26 +590,27 @@ public class ActivityActivity extends AppCompatActivity {
         TextView tvStepCalories = sheetView.findViewById(R.id.tvStepCalories);
         TextView tvActiveTime = sheetView.findViewById(R.id.tvActiveTime);
 
-        // Calculate step data
-        int currentSteps = 0;
-        int goalSteps = 2000;
+        // Use FitnessDataManager for consistent step goal across all activities
+        int currentSteps = fitnessDataManager.getStepsToday();
+        int goalSteps = fitnessDataManager.getStepGoal();
 
-        if (todayActivity != null) {
+        if (todayActivity != null && todayActivity.getSteps() > currentSteps) {
             currentSteps = todayActivity.getSteps();
         }
 
-        int progressPercent = (int) ((currentSteps * 100.0f) / goalSteps);
+        int progressPercent = goalSteps > 0 ? (int) ((currentSteps * 100.0f) / goalSteps) : 0;
         progressPercent = Math.min(progressPercent, 100);
 
         // Update UI
         tvCurrentSteps.setText(String.valueOf(currentSteps));
         tvGoalSteps.setText("of " + goalSteps);
+        progressSteps.setMax(100);
         progressSteps.setProgress(progressPercent);
 
-        // Calculate derived stats (approximations)
-        float distanceKm = currentSteps * 0.0008f; // ~0.8m per step
-        int calories = (int) (currentSteps * 0.04f); // ~0.04 cal per step
-        int activeMinutes = currentSteps / 100; // ~100 steps per minute
+        // Use FitnessDataManager calculated values for consistency
+        float distanceKm = fitnessDataManager.getDistanceToday();
+        int calories = fitnessDataManager.getCaloriesToday();
+        int activeMinutes = fitnessDataManager.getActiveMinutesToday();
 
         tvDistance.setText(String.format(Locale.US, "%.1f km", distanceKm));
         tvStepCalories.setText(String.valueOf(calories));

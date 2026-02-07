@@ -1,10 +1,13 @@
 package com.alignify.exercises;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
+import com.alignify.ml.ModelManager;
 import com.alignify.utils.TFLiteInterpreter;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,9 +16,11 @@ import java.util.List;
  * Provides common functionality for pose analysis and rep counting.
  */
 public abstract class ExerciseDetector {
+    private static final String TAG = "ExerciseDetector";
 
     protected final Context context;
     protected final String modelPath;
+    protected final String modelName;
     protected TFLiteInterpreter tfliteInterpreter;
     protected boolean isInExercise = false;
     protected String lastPrediction = "";
@@ -24,14 +29,33 @@ public abstract class ExerciseDetector {
     public ExerciseDetector(Context context, String modelPath) {
         this.context = context;
         this.modelPath = modelPath;
+        this.modelName = modelPath != null ? modelPath.replace(".tflite", "") : null;
 
         if (modelPath != null) {
-            try {
+            loadModel();
+        }
+    }
+
+    /**
+     * Load model from cache (downloaded) or assets (bundled).
+     */
+    private void loadModel() {
+        try {
+            ModelManager modelManager = ModelManager.getInstance(context);
+            File cachedModel = modelManager.getModelFileSync(modelName);
+
+            if (cachedModel != null) {
+                // Use downloaded/cached model
+                tfliteInterpreter = new TFLiteInterpreter(cachedModel);
+                Log.d(TAG, "Loaded cached model: " + modelName);
+            } else {
+                // Fallback to bundled asset
                 tfliteInterpreter = new TFLiteInterpreter(context, modelPath);
-            } catch (Exception e) {
-                // Model not available, will use rule-based detection
-                e.printStackTrace();
+                Log.d(TAG, "Loaded bundled model: " + modelPath);
             }
+        } catch (Exception e) {
+            // Model not available, will use rule-based detection
+            Log.e(TAG, "Failed to load model: " + modelPath, e);
         }
     }
 
@@ -46,7 +70,8 @@ public abstract class ExerciseDetector {
         private final List<String> errors;
         private final String correctionTip;
 
-        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors, String correctionTip) {
+        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors,
+                String correctionTip) {
             this.isCorrect = isCorrect;
             this.feedback = feedback;
             this.repCount = repCount;
@@ -82,7 +107,7 @@ public abstract class ExerciseDetector {
         public List<String> getErrors() {
             return errors;
         }
-        
+
         public String getCorrectionTip() {
             return correctionTip;
         }

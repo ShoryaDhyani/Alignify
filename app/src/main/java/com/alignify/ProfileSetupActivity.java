@@ -36,8 +36,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
+import com.alignify.util.ProfileImageHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -75,6 +74,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private View bmiScaleContainer;
     private ImageView bmiPointer;
     private MaterialButton btnSaveProfile;
+    private MaterialButton btnSkipProfile;
     private ImageButton btnBack;
     private TextView pageTitle;
 
@@ -91,7 +91,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
                     Uri imageUri = result.getData().getData();
                     if (imageUri != null) {
                         setProfileImage(imageUri);
-                        uploadProfileImage(imageUri);
+                        saveProfileImageLocally(imageUri);
                     }
                 }
             });
@@ -101,7 +101,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
                 if (result.getResultCode() == RESULT_OK) {
                     if (currentPhotoUri != null) {
                         setProfileImage(currentPhotoUri);
-                        uploadProfileImage(currentPhotoUri);
+                        saveProfileImageLocally(currentPhotoUri);
                     }
                 }
             });
@@ -158,8 +158,14 @@ public class ProfileSetupActivity extends AppCompatActivity {
         bmiPointer = findViewById(R.id.bmiPointer);
 
         btnSaveProfile = findViewById(R.id.btnSaveProfile);
+        btnSkipProfile = findViewById(R.id.btnSkipProfile);
         btnBack = findViewById(R.id.btnBack);
         pageTitle = findViewById(R.id.pageTitle);
+
+        // Hide skip button in edit mode
+        if (isEditMode && btnSkipProfile != null) {
+            btnSkipProfile.setVisibility(View.GONE);
+        }
     }
 
     private void setupListeners() {
@@ -182,10 +188,12 @@ public class ProfileSetupActivity extends AppCompatActivity {
         // BMI calculation on height/weight change
         TextWatcher bmiWatcher = new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
 
             @Override
             public void afterTextChanged(Editable s) {
@@ -198,10 +206,31 @@ public class ProfileSetupActivity extends AppCompatActivity {
         // Save button
         btnSaveProfile.setOnClickListener(v -> saveProfile());
 
+        // Skip button - navigate directly to dashboard
+        if (btnSkipProfile != null) {
+            btnSkipProfile.setOnClickListener(v -> skipProfileSetup());
+        }
+
         // Back button
         if (btnBack != null) {
             btnBack.setOnClickListener(v -> onBackPressed());
         }
+    }
+
+    private void skipProfileSetup() {
+        // Save minimal profile info to prefs
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean(KEY_PROFILE_COMPLETE, false) // Still mark as incomplete
+                .apply();
+
+        Toast.makeText(this, "You can complete your profile later in Settings", Toast.LENGTH_SHORT).show();
+
+        // Navigate to dashboard
+        Intent intent = new Intent(this, DashboardActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void selectGender(String gender, MaterialButton selectedBtn) {
@@ -263,28 +292,19 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private void removeProfileImage() {
         profileImageUrl = null;
         profileImage.setImageResource(R.drawable.ic_person);
-        
+
+        // Remove from local storage
+        ProfileImageHelper.deleteProfileImage(this);
+
         // Remove from SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit().remove(KEY_PROFILE_IMAGE_URL).apply();
-        
-        // Remove from Firestore
-        UserRepository.getInstance().updateProfileImageUrl("", new UserRepository.OnCompleteListener() {
-            @Override
-            public void onSuccess() {
-                Toast.makeText(ProfileSetupActivity.this, "Profile picture removed", Toast.LENGTH_SHORT).show();
-            }
 
-            @Override
-            public void onError(String error) {
-                Toast.makeText(ProfileSetupActivity.this, "Failed to remove picture", Toast.LENGTH_SHORT).show();
-            }
-        });
+        Toast.makeText(this, "Profile picture removed", Toast.LENGTH_SHORT).show();
     }
 
     private void checkCameraPermissionAndOpen() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             openCamera();
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
@@ -329,40 +349,17 @@ public class ProfileSetupActivity extends AppCompatActivity {
                 .into(profileImage);
     }
 
-    private void uploadProfileImage(Uri imageUri) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Toast.makeText(this, "Please sign in to upload profile picture", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    private void saveProfileImageLocally(Uri imageUri) {
+        // Save to local storage using ProfileImageHelper
+        boolean saved = ProfileImageHelper.saveProfileImage(this, imageUri);
 
-        // Show loading
-        Toast.makeText(this, "Uploading profile picture...", Toast.LENGTH_SHORT).show();
-
-        // Compress image
-        try {
-            Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
-            byte[] data = baos.toByteArray();
-
-            // Upload to Firebase Storage
-            StorageReference storageRef = FirebaseStorage.getInstance().getReference();
-            StorageReference profileRef = storageRef.child("profile_images/" + user.getUid() + ".jpg");
-
-            profileRef.putBytes(data)
-                    .addOnSuccessListener(taskSnapshot -> {
-                        profileRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                            profileImageUrl = uri.toString();
-                            saveProfileImageUrl(profileImageUrl);
-                            Toast.makeText(this, "Profile picture uploaded!", Toast.LENGTH_SHORT).show();
-                        });
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
-        } catch (IOException e) {
-            Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show();
+        if (saved) {
+            String localPath = ProfileImageHelper.getProfileImagePath(this);
+            profileImageUrl = localPath;
+            saveProfileImageUrl(localPath);
+            Toast.makeText(this, "Profile picture saved!", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Failed to save profile picture", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -373,10 +370,12 @@ public class ProfileSetupActivity extends AppCompatActivity {
         // Also save to Firestore
         UserRepository.getInstance().updateProfileImageUrl(url, new UserRepository.OnCompleteListener() {
             @Override
-            public void onSuccess() {}
+            public void onSuccess() {
+            }
 
             @Override
-            public void onError(String error) {}
+            public void onError(String error) {
+            }
         });
     }
 
@@ -480,7 +479,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
             tilAge.setError(null);
         }
 
-        if (!valid) return;
+        if (!valid)
+            return;
 
         float height = Float.parseFloat(heightStr);
         float weight = Float.parseFloat(weightStr);
@@ -491,10 +491,14 @@ public class ProfileSetupActivity extends AppCompatActivity {
         float bmi = weight / (heightM * heightM);
 
         String category;
-        if (bmi < 18.5f) category = "Underweight";
-        else if (bmi < 25f) category = "Normal";
-        else if (bmi < 30f) category = "Overweight";
-        else category = "Obese";
+        if (bmi < 18.5f)
+            category = "Underweight";
+        else if (bmi < 25f)
+            category = "Normal";
+        else if (bmi < 30f)
+            category = "Overweight";
+        else
+            category = "Obese";
 
         // Save to preferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -529,7 +533,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
                     @Override
                     public void onError(String error) {
                         runOnUiThread(() -> {
-                            Toast.makeText(ProfileSetupActivity.this, 
+                            Toast.makeText(ProfileSetupActivity.this,
                                     "Saved locally. Cloud sync pending.", Toast.LENGTH_SHORT).show();
                             navigateToDashboard();
                         });
@@ -549,17 +553,27 @@ public class ProfileSetupActivity extends AppCompatActivity {
         String imageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, "");
 
         // Populate fields
-        if (!TextUtils.isEmpty(name)) etName.setText(name);
-        if (height > 0) etHeight.setText(String.valueOf((int) height));
-        if (weight > 0) etWeight.setText(String.valueOf((int) weight));
-        if (age > 0) etAge.setText(String.valueOf(age));
+        if (!TextUtils.isEmpty(name))
+            etName.setText(name);
+        if (height > 0)
+            etHeight.setText(String.valueOf((int) height));
+        if (weight > 0)
+            etWeight.setText(String.valueOf((int) weight));
+        if (age > 0)
+            etAge.setText(String.valueOf(age));
 
         // Set gender selection
         if (!TextUtils.isEmpty(gender)) {
             switch (gender) {
-                case "Male": selectGender("Male", btnMale); break;
-                case "Female": selectGender("Female", btnFemale); break;
-                case "Other": selectGender("Other", btnOther); break;
+                case "Male":
+                    selectGender("Male", btnMale);
+                    break;
+                case "Female":
+                    selectGender("Female", btnFemale);
+                    break;
+                case "Other":
+                    selectGender("Other", btnOther);
+                    break;
             }
         }
 
@@ -575,8 +589,17 @@ public class ProfileSetupActivity extends AppCompatActivity {
             }
         }
 
-        // Load profile image from local cache first
-        if (!TextUtils.isEmpty(imageUrl)) {
+        // Load profile image from local storage first (using ProfileImageHelper)
+        if (ProfileImageHelper.hasProfileImage(this)) {
+            String localPath = ProfileImageHelper.getProfileImagePath(this);
+            profileImageUrl = localPath;
+            Glide.with(this)
+                    .load(new java.io.File(localPath))
+                    .circleCrop()
+                    .placeholder(R.drawable.ic_person)
+                    .into(profileImage);
+        } else if (!TextUtils.isEmpty(imageUrl)) {
+            // Fallback to cached URL for backwards compatibility
             profileImageUrl = imageUrl;
             Glide.with(this)
                     .load(imageUrl)
@@ -584,40 +607,13 @@ public class ProfileSetupActivity extends AppCompatActivity {
                     .placeholder(R.drawable.ic_person)
                     .into(profileImage);
         }
-        
-        // Also fetch from Firestore to ensure we have the latest
-        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
-            @Override
-            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
-                if (profileData != null && profileData.containsKey("profileImageUrl")) {
-                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
-                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
-                        profileImageUrl = firebaseImageUrl;
-                        // Update cache
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
-                        
-                        // Load from Firebase URL
-                        if (!isFinishing()) {
-                            Glide.with(ProfileSetupActivity.this)
-                                    .load(firebaseImageUrl)
-                                    .circleCrop()
-                                    .placeholder(R.drawable.ic_person)
-                                    .into(profileImage);
-                        }
-                    }
-                }
-            }
-
-            @Override
-            public void onError(String error) {
-                // Silently fail, keep cached/default image
-            }
-        });
     }
 
     private void setupEditModeUI() {
-        if (pageTitle != null) pageTitle.setText("Edit Profile");
-        if (btnBack != null) btnBack.setVisibility(View.VISIBLE);
+        if (pageTitle != null)
+            pageTitle.setText("Edit Profile");
+        if (btnBack != null)
+            btnBack.setVisibility(View.VISIBLE);
         btnSaveProfile.setText("Save Changes");
     }
 

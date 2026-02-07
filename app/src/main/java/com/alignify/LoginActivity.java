@@ -56,6 +56,7 @@ public class LoginActivity extends AppCompatActivity {
     private EditText passwordInput;
     private Button btnLogin;
     private Button btnGoogle;
+    private Button btnGuest;
     private TextView linkSignup;
     private TextView forgotPassword;
 
@@ -106,6 +107,7 @@ public class LoginActivity extends AppCompatActivity {
         passwordInput = findViewById(R.id.passwordInput);
         btnLogin = findViewById(R.id.btnLogin);
         btnGoogle = findViewById(R.id.btnGoogle);
+        btnGuest = findViewById(R.id.btnGuest);
         linkSignup = findViewById(R.id.linkSignup);
         forgotPassword = findViewById(R.id.forgotPassword);
     }
@@ -113,6 +115,7 @@ public class LoginActivity extends AppCompatActivity {
     private void setupListeners() {
         btnLogin.setOnClickListener(v -> handleEmailLogin());
         btnGoogle.setOnClickListener(v -> handleGoogleSignIn());
+        btnGuest.setOnClickListener(v -> handleGuestLogin());
         linkSignup.setOnClickListener(v -> {
             startActivity(new Intent(this, SignupActivity.class));
         });
@@ -162,6 +165,58 @@ public class LoginActivity extends AppCompatActivity {
                                 : "Authentication failed";
                         Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
                     }
+                });
+    }
+
+    private void handleGuestLogin() {
+        btnGuest.setEnabled(false);
+        btnGuest.setText("Loading...");
+
+        firebaseAuth.signInAnonymously()
+                .addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        Log.d(TAG, "signInAnonymously:success");
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        saveGuestUserAndNavigate(user);
+                    } else {
+                        Log.e(TAG, "signInAnonymously:failure", task.getException());
+                        btnGuest.setEnabled(true);
+                        btnGuest.setText("Continue as Guest");
+                        Toast.makeText(this, "Guest login failed. Please try again.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void saveGuestUserAndNavigate(FirebaseUser user) {
+        if (user == null) {
+            saveLocalAndNavigate(null, "Guest", false);
+            return;
+        }
+
+        String uid = user.getUid();
+        String guestName = "Guest User";
+
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("uid", uid);
+        userData.put("email", "");
+        userData.put("name", guestName);
+        userData.put("isAnonymous", true);
+        userData.put("authProvider", "anonymous");
+        userData.put("createdAt", System.currentTimeMillis());
+        userData.put("lastLoginAt", System.currentTimeMillis());
+        userData.put("profileComplete", false);
+
+        firestore.collection("users").document(uid)
+                .set(userData, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Guest user saved to Firestore");
+                    saveLocalAndNavigate("", guestName, false);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save guest user", e);
+                    // Navigate anyway - data will sync later
+                    saveLocalAndNavigate("", guestName, false);
                 });
     }
 

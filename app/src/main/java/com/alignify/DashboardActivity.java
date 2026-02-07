@@ -24,14 +24,19 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.switchmaterial.SwitchMaterial;
+import android.widget.ImageButton;
 
+import com.alignify.ml.ModelManager;
 import com.alignify.service.StepCounterService;
 import com.alignify.util.NavigationHelper;
 import com.alignify.util.StepCounterHelper;
 import com.alignify.data.DailyActivity;
+import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
+import com.alignify.chatbot.ChatbotActivity;
+import com.alignify.util.ProfileImageHelper;
 import com.bumptech.glide.Glide;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -75,9 +80,10 @@ public class DashboardActivity extends AppCompatActivity {
 
     // Step counter
     private static final String TAG = "DashboardActivity";
-    private static final int STEP_GOAL = 10000; // Daily step goal
+    private FitnessDataManager fitnessDataManager;
     private TextView stepsValue;
-    private SwitchMaterial stepTrackingToggle;
+    private TextView stepGoalText;
+    private ImageButton btnResetSteps;
     private android.widget.ProgressBar stepProgressBar;
     private BroadcastReceiver stepUpdateReceiver;
 
@@ -88,6 +94,9 @@ public class DashboardActivity extends AppCompatActivity {
 
         // Initialize Firebase Auth
         firebaseAuth = FirebaseAuth.getInstance();
+
+        // Initialize FitnessDataManager (single source of truth for fitness data)
+        fitnessDataManager = FitnessDataManager.getInstance(this);
 
         // Initialize Google Sign-In client for logout
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -101,6 +110,12 @@ public class DashboardActivity extends AppCompatActivity {
 
         // Setup step counter
         setupStepCounter();
+
+        // Load data from Firestore and sync with local
+        fitnessDataManager.loadFromFirestore(null);
+
+        // Check for model updates
+        checkForModelUpdates();
     }
 
     @Override
@@ -126,44 +141,42 @@ public class DashboardActivity extends AppCompatActivity {
         if (stepUpdateReceiver != null) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(stepUpdateReceiver);
         }
-        // Sync current steps to Firestore
-        saveTodayStepsToFirestore();
+        // Sync current steps to FitnessDataManager (which handles Firestore sync)
+        syncStepsToManager();
     }
 
     /**
-     * Loads today's activity data from Firestore to display.
+     * Loads today's activity data from FitnessDataManager.
      */
     private void loadTodayActivityFromFirestore() {
-        UserRepository.getInstance().getTodayActivity(activity -> {
-            if (activity != null) {
-                runOnUiThread(() -> {
-                    // Update UI with Firestore data if higher than local
-                    int localSteps = StepCounterHelper.getStepsToday(this);
-                    int firestoreSteps = activity.getSteps();
-                    if (firestoreSteps > localSteps) {
-                        updateStepUI(firestoreSteps);
-                    }
-                    Log.d(TAG, "Loaded from Firestore: steps=" + firestoreSteps +
-                            ", calories=" + activity.getCalories() +
-                            ", activeMinutes=" + activity.getActiveMinutes());
-                });
-            }
+        // Use FitnessDataManager which handles local cache + Firestore sync
+        int steps = fitnessDataManager.getStepsToday();
+        updateStepUI(steps);
+
+        // Also load from Firestore to merge any remote data
+        fitnessDataManager.loadFromFirestore(() -> {
+            runOnUiThread(() -> {
+                int mergedSteps = fitnessDataManager.getStepsToday();
+                updateStepUI(mergedSteps);
+                Log.d(TAG, "Loaded from FitnessDataManager: steps=" + mergedSteps +
+                        ", calories=" + fitnessDataManager.getCaloriesToday() +
+                        ", activeMinutes=" + fitnessDataManager.getActiveMinutesToday());
+            });
         });
     }
 
     /**
-     * Saves current step count to Firestore.
+     * Syncs current step count to FitnessDataManager.
      */
-    private void saveTodayStepsToFirestore() {
+    private void syncStepsToManager() {
         if (!StepCounterHelper.isStepTrackingEnabled(this))
             return;
 
         int steps = StepCounterHelper.getStepsToday(this);
         if (steps > 0) {
-            int calories = (int) (steps * 0.04);
-            float distance = steps * 0.0007f;
-            UserRepository.getInstance().updateTodaySteps(steps, calories, distance);
-            Log.d(TAG, "Saved steps to Firestore: " + steps);
+            // FitnessDataManager auto-calculates calories and distance
+            fitnessDataManager.setStepsToday(steps);
+            Log.d(TAG, "Synced steps to FitnessDataManager: " + steps);
         }
     }
 
@@ -242,8 +255,18 @@ public class DashboardActivity extends AppCompatActivity {
         }
         navUserEmail.setText(email);
 
-        // Load profile photo - prioritize custom uploaded photo, then Google/Firebase account photos
-        if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
+        // Load profile photo - prioritize local storage, then cached URL, then
+        // Google/Firebase
+        // account photos
+        if (ProfileImageHelper.hasProfileImage(this)) {
+            String localPath = ProfileImageHelper.getProfileImagePath(this);
+            Glide.with(this)
+                    .load(new java.io.File(localPath))
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(navAvatar);
+        } else if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
             Glide.with(this)
                     .load(cachedProfileImageUrl)
                     .placeholder(R.drawable.ic_profile)
@@ -269,35 +292,6 @@ public class DashboardActivity extends AppCompatActivity {
                 navAvatar.setImageResource(R.drawable.ic_profile);
             }
         }
-        
-        // Also fetch from Firestore to ensure we have the latest
-        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
-            @Override
-            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
-                if (profileData != null && profileData.containsKey("profileImageUrl")) {
-                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
-                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
-                        // Update cache
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
-                        
-                        // Load from Firebase URL
-                        if (!isFinishing()) {
-                            Glide.with(DashboardActivity.this)
-                                    .load(firebaseImageUrl)
-                                    .placeholder(R.drawable.ic_profile)
-                                    .error(R.drawable.ic_profile)
-                                    .circleCrop()
-                                    .into(navAvatar);
-                        }
-                    }
-                }
-            }
-
-            @Override
-            public void onError(String error) {
-                // Silently fail, keep cached/default image
-            }
-        });
     }
 
     private void loadUserProfile() {
@@ -339,54 +333,35 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void loadProfileImage() {
-        // First, try to load from SharedPreferences (faster local cache)
+        // First, try to load from local storage (ProfileImageHelper)
+        if (ProfileImageHelper.hasProfileImage(this) && ivProfileImage != null) {
+            String localPath = ProfileImageHelper.getProfileImagePath(this);
+            Glide.with(this)
+                    .load(new java.io.File(localPath))
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+            return;
+        }
+
+        // Fallback to SharedPreferences cached URL (for backwards compatibility)
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String cachedImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
-        
+
         if (cachedImageUrl != null && !cachedImageUrl.isEmpty() && ivProfileImage != null) {
-            // Load cached image immediately
             Glide.with(this)
                     .load(cachedImageUrl)
                     .placeholder(R.drawable.ic_profile)
                     .error(R.drawable.ic_profile)
                     .circleCrop()
                     .into(ivProfileImage);
+        } else {
+            // No custom profile image, try Google/Firebase account photos
+            loadDefaultAccountPhoto();
         }
-        
-        // Then fetch from Firestore to ensure we have the latest
-        UserRepository.getInstance().loadUserProfile(new UserRepository.OnProfileLoadedListener() {
-            @Override
-            public void onProfileLoaded(java.util.Map<String, Object> profileData) {
-                if (profileData != null && profileData.containsKey("profileImageUrl")) {
-                    String firebaseImageUrl = (String) profileData.get("profileImageUrl");
-                    if (firebaseImageUrl != null && !firebaseImageUrl.isEmpty()) {
-                        // Update cache
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
-                        
-                        // Load from Firebase URL
-                        if (ivProfileImage != null && !isFinishing()) {
-                            Glide.with(DashboardActivity.this)
-                                    .load(firebaseImageUrl)
-                                    .placeholder(R.drawable.ic_profile)
-                                    .error(R.drawable.ic_profile)
-                                    .circleCrop()
-                                    .into(ivProfileImage);
-                        }
-                    }
-                } else {
-                    // No custom profile image, try Google/Firebase account photos
-                    loadDefaultAccountPhoto();
-                }
-            }
-
-            @Override
-            public void onError(String error) {
-                // On error, try Google/Firebase account photos
-                loadDefaultAccountPhoto();
-            }
-        });
     }
-    
+
     private void loadDefaultAccountPhoto() {
         GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
         FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
@@ -412,6 +387,14 @@ public class DashboardActivity extends AppCompatActivity {
 
     private void setupListeners() {
         btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
+
+        // Chatbot FAB
+        FloatingActionButton fabChatbot = findViewById(R.id.fabChatbot);
+        if (fabChatbot != null) {
+            fabChatbot.setOnClickListener(v -> {
+                startActivity(new Intent(this, ChatbotActivity.class));
+            });
+        }
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {
@@ -491,9 +474,10 @@ public class DashboardActivity extends AppCompatActivity {
      * Sets up the step counter feature.
      */
     private void setupStepCounter() {
-        // Initialize views (these need to be added to your layout)
+        // Initialize views
         stepsValue = findViewById(R.id.stepsValue);
-        stepTrackingToggle = findViewById(R.id.stepTrackingToggle);
+        stepGoalText = findViewById(R.id.stepGoalText);
+        btnResetSteps = findViewById(R.id.btnResetSteps);
         stepProgressBar = findViewById(R.id.stepProgressBar);
 
         // Check if step counter is available
@@ -502,32 +486,68 @@ public class DashboardActivity extends AppCompatActivity {
             if (stepsValue != null) {
                 stepsValue.setText("N/A");
             }
-            if (stepTrackingToggle != null) {
-                stepTrackingToggle.setEnabled(false);
+            if (stepGoalText != null) {
+                stepGoalText.setText("Step counter not available");
+            }
+            if (btnResetSteps != null) {
+                btnResetSteps.setEnabled(false);
+                btnResetSteps.setAlpha(0.3f);
             }
             return;
         }
 
-        // Load saved step tracking state
-        boolean stepTrackingEnabled = StepCounterHelper.isStepTrackingEnabled(this);
-
-        if (stepTrackingToggle != null) {
-            stepTrackingToggle.setChecked(stepTrackingEnabled);
-            stepTrackingToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) {
-                    startStepTracking();
-                } else {
-                    StepCounterHelper.stopStepTracking(this);
-                    if (stepsValue != null) {
-                        stepsValue.setText("0");
-                    }
-                }
-            });
+        // Setup reset button with confirmation
+        if (btnResetSteps != null) {
+            btnResetSteps.setOnClickListener(v -> showResetStepsConfirmation());
         }
 
-        // If step tracking was enabled, start it
-        if (stepTrackingEnabled) {
-            startStepTracking();
+        // Always start step tracking if permissions are granted
+        startStepTracking();
+    }
+
+    /**
+     * Shows confirmation dialog before resetting steps.
+     */
+    private void showResetStepsConfirmation() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Reset Today's Steps")
+                .setMessage("This will reset your step count to zero. This action cannot be undone.")
+                .setPositiveButton("Reset", (dialog, which) -> resetSteps())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * Resets steps both locally and in Firestore.
+     */
+    private void resetSteps() {
+        // Reset local step counter
+        StepCounterService.resetStepCounter(this);
+
+        // Reset in Firestore
+        UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
+            @Override
+            public void onSuccess() {
+                runOnUiThread(() -> {
+                    updateStepCountDisplay();
+                    Toast.makeText(DashboardActivity.this, "Steps reset successfully", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    Toast.makeText(DashboardActivity.this, "Failed to sync reset: " + error, Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+
+        // Update UI immediately
+        if (stepsValue != null) {
+            stepsValue.setText("0");
+        }
+        if (stepProgressBar != null) {
+            stepProgressBar.setProgress(0);
         }
     }
 
@@ -571,6 +591,9 @@ public class DashboardActivity extends AppCompatActivity {
         if (StepCounterHelper.isStepTrackingEnabled(this)) {
             int steps = StepCounterHelper.getStepsToday(this);
             updateStepUI(steps);
+
+            // Also sync to FitnessDataManager
+            fitnessDataManager.setStepsToday(steps);
         }
     }
 
@@ -578,11 +601,16 @@ public class DashboardActivity extends AppCompatActivity {
      * Updates the step counter UI elements.
      */
     private void updateStepUI(int steps) {
+        int stepGoal = fitnessDataManager.getStepGoal();
         if (stepsValue != null) {
             stepsValue.setText(String.valueOf(steps));
         }
+        if (stepGoalText != null) {
+            stepGoalText.setText(steps + " / " + stepGoal + " steps");
+        }
         if (stepProgressBar != null) {
-            stepProgressBar.setProgress(Math.min(steps, STEP_GOAL));
+            stepProgressBar.setMax(stepGoal);
+            stepProgressBar.setProgress(Math.min(steps, stepGoal));
         }
     }
 
@@ -607,10 +635,31 @@ public class DashboardActivity extends AppCompatActivity {
             } else {
                 Log.w(TAG, "Step counter permissions denied");
                 Toast.makeText(this, "Step tracking requires permissions", Toast.LENGTH_SHORT).show();
-                if (stepTrackingToggle != null) {
-                    stepTrackingToggle.setChecked(false);
-                }
             }
         }
+    }
+
+    /**
+     * Check for AI model updates and show dialog if available.
+     */
+    private void checkForModelUpdates() {
+        ModelManager.getInstance(this).checkForUpdates(this,
+                new ModelManager.UpdateCheckCallback() {
+                    @Override
+                    public void onUpdatesAvailable(java.util.List<ModelManager.ModelInfo> updates) {
+                        // User chose "Later" - updates are pending
+                        Log.d(TAG, updates.size() + " model updates available");
+                    }
+
+                    @Override
+                    public void onNoUpdates() {
+                        Log.d(TAG, "All models are up to date");
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "Error checking for model updates: " + error);
+                    }
+                });
     }
 }

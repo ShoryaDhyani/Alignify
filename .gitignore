@@ -16,10 +16,63 @@ captures/
 *.aab
 *.jks
 *.keystore
+signing.properties
+
+# Firebase (contains API keys)
+google-services.json
+**/google-services.json
+
+# API Keys and credentials
+secrets.properties
+*.credentials
+*.secret
+api_keys.xml
+credentials.json
+**/credentials.json
+
+# Environment files
+.env
+.env.*
+*.env
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 *.log
+logs/
+
+# Cache and temp
+*.tmp
+*.temp
+*.cache
+
+# Editor/IDE specific
+*.swp
+*.swo
+*~
+.vscode/
+.vs/
+
+# Android
+.navigation/
+output.json
+output-metadata.json
+
+# Test outputs
+app/build/
+test-results/
+
+# Proguard
+proguard/
+mapping.txt
+
+# Local machine paths
+local.properties
+sdk.dir
+
+# Sensitive data
+app/src/main/res/values/secrets.xml
+**/api_key*.xml

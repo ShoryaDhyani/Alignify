@@ -1,138 +1,101 @@
 package com.alignify.util;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 
-import java.text.SimpleDateFormat;
+import com.alignify.data.FitnessDataManager;
+
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
 
 /**
- * Helper class for tracking daily water intake using SharedPreferences.
- * Automatically resets at midnight for each new day.
+ * Helper class for tracking daily water intake.
+ * 
+ * This class now delegates to FitnessDataManager for consistent data management
+ * across all activities. FitnessDataManager handles:
+ * - Local caching in SharedPreferences
+ * - Automatic midnight reset
+ * - Firebase Firestore sync
+ * 
+ * @deprecated Use FitnessDataManager directly for new code. This class is kept
+ *             for backward compatibility and to avoid breaking existing code.
  */
 public class WaterTrackingHelper {
 
-    private static final String PREFS_NAME = "water_tracking_prefs";
-    private static final String KEY_WATER_CUPS = "water_cups";
-    private static final String KEY_WATER_GOAL = "water_goal";
-    private static final String KEY_LAST_TRACKED_DATE = "last_tracked_date";
-    private static final int DEFAULT_WATER_GOAL = 8;
-
-    private final SharedPreferences prefs;
+    private final FitnessDataManager fitnessDataManager;
 
     public WaterTrackingHelper(Context context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        checkAndResetForNewDay();
-    }
-
-    /**
-     * Check if date has changed and reset water cups if new day.
-     */
-    private void checkAndResetForNewDay() {
-        String today = getTodayDateString();
-        String lastTrackedDate = prefs.getString(KEY_LAST_TRACKED_DATE, "");
-
-        if (!today.equals(lastTrackedDate)) {
-            // New day - reset water cups
-            prefs.edit()
-                    .putInt(KEY_WATER_CUPS, 0)
-                    .putString(KEY_LAST_TRACKED_DATE, today)
-                    .apply();
-        }
+        fitnessDataManager = FitnessDataManager.getInstance(context);
     }
 
     /**
      * Get current water cups count for today.
      */
     public int getWaterCups() {
-        checkAndResetForNewDay();
-        return prefs.getInt(KEY_WATER_CUPS, 0);
+        return fitnessDataManager.getWaterCupsToday();
     }
 
     /**
      * Set water cups count.
      */
     public void setWaterCups(int cups) {
-        prefs.edit()
-                .putInt(KEY_WATER_CUPS, Math.max(0, cups))
-                .putString(KEY_LAST_TRACKED_DATE, getTodayDateString())
-                .apply();
+        fitnessDataManager.setWaterCupsToday(cups);
     }
 
     /**
      * Add one cup of water.
      */
     public int addWaterCup() {
-        int current = getWaterCups();
-        int newValue = current + 1;
-        setWaterCups(newValue);
-        return newValue;
+        return fitnessDataManager.addWaterCup();
     }
 
     /**
      * Remove one cup of water (minimum 0).
      */
     public int removeWaterCup() {
-        int current = getWaterCups();
-        int newValue = Math.max(0, current - 1);
-        setWaterCups(newValue);
-        return newValue;
+        return fitnessDataManager.removeWaterCup();
     }
 
     /**
      * Get daily water goal.
      */
     public int getWaterGoal() {
-        return prefs.getInt(KEY_WATER_GOAL, DEFAULT_WATER_GOAL);
+        return fitnessDataManager.getWaterGoal();
     }
 
     /**
      * Set daily water goal.
      */
     public void setWaterGoal(int goal) {
-        prefs.edit()
-                .putInt(KEY_WATER_GOAL, Math.max(1, goal))
-                .apply();
+        fitnessDataManager.setWaterGoal(goal);
     }
 
     /**
      * Get progress as a percentage (0-100).
      */
     public int getProgressPercent() {
-        int cups = getWaterCups();
-        int goal = getWaterGoal();
-        return Math.min(100, (cups * 100) / goal);
+        return fitnessDataManager.getWaterProgressPercent();
     }
 
     /**
      * Check if water goal has been reached.
      */
     public boolean isGoalReached() {
-        return getWaterCups() >= getWaterGoal();
+        return fitnessDataManager.isWaterGoalReached();
     }
 
     /**
      * Get remaining cups to reach goal.
      */
     public int getRemainingCups() {
-        return Math.max(0, getWaterGoal() - getWaterCups());
+        int goal = fitnessDataManager.getWaterGoal();
+        int cups = fitnessDataManager.getWaterCupsToday();
+        return Math.max(0, goal - cups);
     }
 
     /**
      * Get formatted progress string (e.g., "6/8 Cups").
      */
     public String getProgressString() {
-        return getWaterCups() + "/" + getWaterGoal() + " Cups";
-    }
-
-    /**
-     * Get today's date as string in yyyy-MM-dd format.
-     */
-    private String getTodayDateString() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        return sdf.format(new Date());
+        return fitnessDataManager.getWaterProgressString();
     }
 
     /**

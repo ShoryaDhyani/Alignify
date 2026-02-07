@@ -2,6 +2,8 @@ package com.alignify;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.ImageView;
@@ -11,10 +13,10 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
-import com.alignify.util.WaterTrackingHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -33,10 +35,7 @@ import java.util.Locale;
 public class SettingsActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "AlignifyPrefs";
-    private static final String KEY_STEP_GOAL = "step_goal";
-    private static final String KEY_CALORIE_GOAL = "calorie_goal";
     private static final String KEY_DISTANCE_UNIT = "distance_unit";
-    private static final String KEY_WATER_GOAL = "water_goal";
     private static final String KEY_WATER_REMINDERS = "water_reminders_enabled";
 
     // Views
@@ -50,6 +49,7 @@ public class SettingsActivity extends AppCompatActivity {
     private SwitchMaterial switchWaterReminders;
 
     // Data
+    private FitnessDataManager fitnessDataManager;
     private int stepGoal = 10000;
     private int calorieGoal = 500;
     private int waterGoal = 8;
@@ -62,6 +62,9 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings_new);
+
+        // Initialize FitnessDataManager (single source of truth for goals)
+        fitnessDataManager = FitnessDataManager.getInstance(this);
 
         firebaseAuth = FirebaseAuth.getInstance();
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -93,13 +96,27 @@ public class SettingsActivity extends AppCompatActivity {
         tvUserEmail = findViewById(R.id.tvUserEmail);
         ivProfileImage = findViewById(R.id.ivProfileImage);
         switchWaterReminders = findViewById(R.id.switchWaterReminders);
+
+        // Set app version dynamically from PackageInfo
+        TextView tvAppVersion = findViewById(R.id.tvAppVersion);
+        if (tvAppVersion != null) {
+            try {
+                PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                tvAppVersion.setText("Alignify v" + pInfo.versionName);
+            } catch (PackageManager.NameNotFoundException e) {
+                tvAppVersion.setText("Alignify");
+            }
+        }
     }
 
     private void loadSettings() {
+        // Load goals from FitnessDataManager (centralized source of truth)
+        stepGoal = fitnessDataManager.getStepGoal();
+        calorieGoal = fitnessDataManager.getCaloriesGoal();
+        waterGoal = fitnessDataManager.getWaterGoal();
+
+        // Load other settings from SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        stepGoal = prefs.getInt(KEY_STEP_GOAL, 10000);
-        calorieGoal = prefs.getInt(KEY_CALORIE_GOAL, 500);
-        waterGoal = prefs.getInt(KEY_WATER_GOAL, 8);
         useKilometers = prefs.getBoolean(KEY_DISTANCE_UNIT, true);
         boolean waterRemindersEnabled = prefs.getBoolean(KEY_WATER_REMINDERS, true);
         switchWaterReminders.setChecked(waterRemindersEnabled);
@@ -324,9 +341,7 @@ public class SettingsActivity extends AppCompatActivity {
                                 waterGoal = newGoal;
                                 saveSettings();
                                 updateUI();
-                                // Update WaterTrackingHelper goal
-                                WaterTrackingHelper helper = new WaterTrackingHelper(this);
-                                helper.setWaterGoal(waterGoal);
+                                // FitnessDataManager is updated in saveSettings()
                             } else {
                                 Toast.makeText(this, "Enter a value between 1 and 20", Toast.LENGTH_SHORT).show();
                             }
@@ -353,11 +368,14 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void saveSettings() {
+        // Save goals to FitnessDataManager (syncs to Firestore automatically)
+        fitnessDataManager.setStepGoal(stepGoal);
+        fitnessDataManager.setCaloriesGoal(calorieGoal);
+        fitnessDataManager.setWaterGoal(waterGoal);
+
+        // Save other settings to SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit()
-                .putInt(KEY_STEP_GOAL, stepGoal)
-                .putInt(KEY_CALORIE_GOAL, calorieGoal)
-                .putInt(KEY_WATER_GOAL, waterGoal)
                 .putBoolean(KEY_DISTANCE_UNIT, useKilometers)
                 .apply();
 

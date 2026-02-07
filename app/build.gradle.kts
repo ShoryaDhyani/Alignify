@@ -111,4 +111,8 @@ dependencies {
     
     // MPAndroidChart for activity graphs
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    
+    // Chatbot - HTTP Client
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }

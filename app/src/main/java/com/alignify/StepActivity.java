@@ -4,9 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Switch;
@@ -16,8 +14,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.alignify.data.DailyActivity;
-import com.alignify.data.UserRepository;
+import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.ActivityEngine;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.StepCounterService;
@@ -34,9 +31,6 @@ import java.util.Locale;
 public class StepActivity extends AppCompatActivity {
 
     private static final String TAG = "StepActivity";
-    private static final String PREFS_NAME = "AlignifyPrefs";
-    private static final String KEY_STEP_GOAL = "step_goal";
-    private static final int DEFAULT_STEP_GOAL = 10000;
 
     // Views
     private TextView tvStepCount;
@@ -55,14 +49,17 @@ public class StepActivity extends AppCompatActivity {
     private CaloriesEngine caloriesEngine;
     private ActivityEngine activityEngine;
 
-    // State
-    private int stepGoal = DEFAULT_STEP_GOAL;
+    // Data manager (single source of truth)
+    private FitnessDataManager fitnessDataManager;
     private BroadcastReceiver stepUpdateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_step_new);
+
+        // Initialize FitnessDataManager (single source of truth for fitness data)
+        fitnessDataManager = FitnessDataManager.getInstance(this);
 
         initViews();
         initEngines();
@@ -84,8 +81,8 @@ public class StepActivity extends AppCompatActivity {
         ivActivityIcon = findViewById(R.id.ivActivityIcon);
         switchTracking = findViewById(R.id.switchTracking);
 
-        // Set max for progress circle
-        stepProgressCircle.setMax(DEFAULT_STEP_GOAL);
+        // Set max for progress circle from FitnessDataManager
+        stepProgressCircle.setMax(fitnessDataManager.getStepGoal());
     }
 
     private void initEngines() {
@@ -121,8 +118,8 @@ public class StepActivity extends AppCompatActivity {
     }
 
     private void loadGoal() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        stepGoal = prefs.getInt(KEY_STEP_GOAL, DEFAULT_STEP_GOAL);
+        // Use FitnessDataManager for centralized goal management
+        int stepGoal = fitnessDataManager.getStepGoal();
         stepProgressCircle.setMax(stepGoal);
         tvGoalValue.setText(NumberFormat.getNumberInstance(Locale.US).format(stepGoal) + " steps");
     }
@@ -134,10 +131,10 @@ public class StepActivity extends AppCompatActivity {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Set Daily Step Goal")
                 .setItems(goals, (dialog, which) -> {
-                    stepGoal = goalValues[which];
-                    SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-                    prefs.edit().putInt(KEY_STEP_GOAL, stepGoal).apply();
-                    stepProgressCircle.setMax(stepGoal);
+                    // Use FitnessDataManager to set goal (syncs to Firestore automatically)
+                    int newGoal = goalValues[which];
+                    fitnessDataManager.setStepGoal(newGoal);
+                    stepProgressCircle.setMax(newGoal);
                     tvGoalValue.setText(goals[which] + " steps");
                     updateUI(StepCounterHelper.getStepsToday(this));
                 })
@@ -179,36 +176,49 @@ public class StepActivity extends AppCompatActivity {
         int localSteps = StepCounterHelper.getStepsToday(this);
         updateUI(localSteps);
 
+        // Sync to FitnessDataManager
+        fitnessDataManager.setStepsToday(localSteps);
+
         // Then load from Firestore (might have higher count from other devices)
-        UserRepository.getInstance().getTodayActivity(activity -> {
-            if (activity != null) {
-                runOnUiThread(() -> {
-                    int firestoreSteps = activity.getSteps();
-                    if (firestoreSteps > localSteps) {
-                        updateUI(firestoreSteps);
-                    }
-                    // Update active minutes from Firestore
-                    tvActiveMinutes.setText(String.valueOf(activity.getActiveMinutes()));
-                });
-            }
+        fitnessDataManager.loadFromFirestore(() -> {
+            runOnUiThread(() -> {
+                int mergedSteps = fitnessDataManager.getStepsToday();
+                if (mergedSteps > localSteps) {
+                    updateUI(mergedSteps);
+                }
+                // Update active minutes from FitnessDataManager
+                tvActiveMinutes.setText(String.valueOf(fitnessDataManager.getActiveMinutesToday()));
+            });
         });
     }
 
     private void updateUI(int steps) {
+        // Get step goal from FitnessDataManager
+        int stepGoal = fitnessDataManager.getStepGoal();
+
         // Step count with formatting
         tvStepCount.setText(NumberFormat.getNumberInstance(Locale.US).format(steps));
 
         // Progress
+        stepProgressCircle.setMax(stepGoal);
         stepProgressCircle.setProgress(Math.min(steps, stepGoal));
         int percentage = stepGoal > 0 ? (steps * 100 / stepGoal) : 0;
         tvGoalProgress.setText(percentage + "% of goal");
 
-        // Distance (estimated: average stride ~0.7m)
-        float distanceKm = (steps * 0.7f) / 1000f;
+        // Distance from FitnessDataManager (consistent calculation)
+        float distanceKm = fitnessDataManager.getDistanceToday();
+        if (distanceKm == 0 && steps > 0) {
+            // Fallback calculation if not yet synced
+            distanceKm = (steps * 0.7f) / 1000f;
+        }
         tvDistance.setText(String.format(Locale.US, "%.1f", distanceKm));
 
-        // Calories from CaloriesEngine
-        int calories = caloriesEngine.getCaloriesFromSteps(steps);
+        // Calories from FitnessDataManager
+        int calories = fitnessDataManager.getCaloriesToday();
+        if (calories == 0 && steps > 0) {
+            // Fallback to CaloriesEngine
+            calories = caloriesEngine.getCaloriesFromSteps(steps);
+        }
         tvCalories.setText(String.valueOf(calories));
 
         // Activity status

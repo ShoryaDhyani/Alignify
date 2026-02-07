@@ -193,6 +193,94 @@ public class UserRepository {
                 });
     }
 
+    // ============ Goals Methods ============
+
+    /**
+     * Save user's fitness goals to Firestore.
+     */
+    public void saveGoals(int stepGoal, int caloriesGoal, int activeTimeGoal,
+            int waterGoal, float sleepGoal, OnCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        Map<String, Object> goals = new HashMap<>();
+        goals.put("stepGoal", stepGoal);
+        goals.put("caloriesGoal", caloriesGoal);
+        goals.put("activeTimeGoal", activeTimeGoal);
+        goals.put("waterGoal", waterGoal);
+        goals.put("sleepGoal", sleepGoal);
+        goals.put("updatedAt", System.currentTimeMillis());
+
+        userDoc.update(goals)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Goals saved successfully");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    // Document might not exist, try set with merge
+                    userDoc.set(goals, SetOptions.merge())
+                            .addOnSuccessListener(aVoid2 -> {
+                                Log.d(TAG, "Goals saved (merged)");
+                                if (listener != null)
+                                    listener.onSuccess();
+                            })
+                            .addOnFailureListener(e2 -> {
+                                Log.e(TAG, "Error saving goals", e2);
+                                if (listener != null)
+                                    listener.onError(e2.getMessage());
+                            });
+                });
+    }
+
+    /**
+     * Load user's fitness goals from Firestore.
+     */
+    public void loadGoals(OnGoalsLoadedListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onGoalsLoaded(null);
+            return;
+        }
+
+        userDoc.get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists()) {
+                        Map<String, Object> goals = new HashMap<>();
+                        if (document.contains("stepGoal")) {
+                            goals.put("stepGoal", document.get("stepGoal"));
+                        }
+                        if (document.contains("caloriesGoal")) {
+                            goals.put("caloriesGoal", document.get("caloriesGoal"));
+                        }
+                        if (document.contains("activeTimeGoal")) {
+                            goals.put("activeTimeGoal", document.get("activeTimeGoal"));
+                        }
+                        if (document.contains("waterGoal")) {
+                            goals.put("waterGoal", document.get("waterGoal"));
+                        }
+                        if (document.contains("sleepGoal")) {
+                            goals.put("sleepGoal", document.get("sleepGoal"));
+                        }
+                        if (listener != null)
+                            listener.onGoalsLoaded(goals);
+                    } else {
+                        if (listener != null)
+                            listener.onGoalsLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading goals", e);
+                    if (listener != null)
+                        listener.onGoalsLoaded(null);
+                });
+    }
+
     // ============ Daily Activity Methods ============
 
     private static final String COLLECTION_DAILY_ACTIVITY = "dailyActivity";
@@ -338,6 +426,40 @@ public class UserRepository {
                 .set(updates, SetOptions.merge())
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Steps updated: " + steps))
                 .addOnFailureListener(e -> Log.e(TAG, "Error updating steps", e));
+    }
+
+    /**
+     * Reset today's step count to zero in Firestore.
+     */
+    public void resetTodaySteps(OnCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        String today = DailyActivity.todayKey();
+        Map<String, Object> resetData = new HashMap<>();
+        resetData.put("date", today);
+        resetData.put("steps", 0);
+        resetData.put("calories", 0);
+        resetData.put("distance", 0.0f);
+        resetData.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .set(resetData, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Steps reset successfully");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error resetting steps", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
@@ -520,5 +642,9 @@ public class UserRepository {
 
     public interface OnActivitiesListener {
         void onActivitiesLoaded(java.util.List<Map<String, Object>> activities);
+    }
+
+    public interface OnGoalsLoadedListener {
+        void onGoalsLoaded(Map<String, Object> goals);
     }
 }
