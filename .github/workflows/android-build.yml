@@ -31,6 +31,9 @@ jobs:
         gradle-version: '8.4'
         cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       
+    - name: Decode google-services.json
+      run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
+        
     - name: Build Debug APK
       run: gradle assembleDebug --parallel --build-cache
       
@@ -63,6 +66,9 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
+
+    - name: Decode google-services.json
+      run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
 
     - name: Check for signing secrets
       id: check_secrets
