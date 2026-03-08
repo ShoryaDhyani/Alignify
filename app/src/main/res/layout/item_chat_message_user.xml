@@ -31,7 +31,7 @@
                 android:id="@+id/text_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/black"
+                android:textColor="@color/text_primary_dark"
                 android:textSize="15sp"
                 android:lineSpacingMultiplier="1.2" />
 
@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
                 android:layout_marginTop="4dp"
-                android:textColor="#80000000"
+                android:textColor="@color/text_black_50"
                 android:textSize="11sp" />
 
         </LinearLayout>

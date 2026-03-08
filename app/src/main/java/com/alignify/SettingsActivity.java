@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 
 import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
@@ -22,6 +23,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import android.view.View;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -47,6 +49,10 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvUserEmail;
     private ImageView ivProfileImage;
     private SwitchMaterial switchWaterReminders;
+    private TextView tvThemeMode;
+
+    // Guard flag to prevent listener re-trigger during programmatic setChecked() calls
+    private boolean isUpdatingUI = false;
 
     // Data
     private FitnessDataManager fitnessDataManager;
@@ -96,6 +102,7 @@ public class SettingsActivity extends AppCompatActivity {
         tvUserEmail = findViewById(R.id.tvUserEmail);
         ivProfileImage = findViewById(R.id.ivProfileImage);
         switchWaterReminders = findViewById(R.id.switchWaterReminders);
+        tvThemeMode = findViewById(R.id.tvThemeMode);
 
         // Set app version dynamically from PackageInfo
         TextView tvAppVersion = findViewById(R.id.tvAppVersion);
@@ -118,8 +125,15 @@ public class SettingsActivity extends AppCompatActivity {
         // Load other settings from SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         useKilometers = prefs.getBoolean(KEY_DISTANCE_UNIT, true);
-        boolean waterRemindersEnabled = prefs.getBoolean(KEY_WATER_REMINDERS, true);
-        switchWaterReminders.setChecked(waterRemindersEnabled);
+
+        // Guard against listener re-trigger during programmatic setChecked()
+        isUpdatingUI = true;
+        switchWaterReminders.setChecked(prefs.getBoolean(KEY_WATER_REMINDERS, true));
+        isUpdatingUI = false;
+
+        // Update theme mode display
+        String themeMode = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
+        updateThemeModeDisplay(themeMode);
 
         updateUI();
     }
@@ -214,6 +228,8 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.settingLogout).setOnClickListener(v -> showLogoutConfirmation());
 
         switchWaterReminders.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isUpdatingUI) return;
+
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             prefs.edit().putBoolean(KEY_WATER_REMINDERS, isChecked).apply();
 
@@ -225,6 +241,64 @@ public class SettingsActivity extends AppCompatActivity {
                 Toast.makeText(this, "Water reminders disabled", Toast.LENGTH_SHORT).show();
             }
         });
+
+        // Theme mode selector
+        View settingTheme = findViewById(R.id.settingDarkMode);
+        if (settingTheme != null) {
+            settingTheme.setOnClickListener(v -> showThemeModeDialog());
+        }
+    }
+
+    private void updateThemeModeDisplay(String themeMode) {
+        if (tvThemeMode == null) return;
+        switch (themeMode) {
+            case "dark":
+                tvThemeMode.setText("Dark");
+                break;
+            case "light":
+                tvThemeMode.setText("Light");
+                break;
+            default:
+                tvThemeMode.setText("System Default");
+                break;
+        }
+    }
+
+    private void showThemeModeDialog() {
+        final String[] options = {"Light", "Dark", "System Default"};
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String current = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
+        int checkedItem = current.equals("dark") ? 1 : current.equals("system") ? 2 : 0;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Theme")
+                .setSingleChoiceItems(options, checkedItem, (dialog, which) -> {
+                    String selected;
+                    int nightMode;
+                    switch (which) {
+                        case 1:
+                            selected = "dark";
+                            nightMode = AppCompatDelegate.MODE_NIGHT_YES;
+                            break;
+                        case 2:
+                            selected = "system";
+                            nightMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+                            break;
+                        default:
+                            selected = "light";
+                            nightMode = AppCompatDelegate.MODE_NIGHT_NO;
+                            break;
+                    }
+                    prefs.edit()
+                            .putString(AlignifyApp.KEY_THEME_MODE, selected)
+                            .putBoolean(AlignifyApp.KEY_DARK_MODE, "dark".equals(selected))
+                            .apply();
+                    updateThemeModeDisplay(selected);
+                    dialog.dismiss();
+                    AppCompatDelegate.setDefaultNightMode(nightMode);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void setupBottomNavigation() {

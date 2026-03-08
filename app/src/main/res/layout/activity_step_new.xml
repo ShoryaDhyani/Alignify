@@ -66,7 +66,7 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="24dp"
                 app:cardElevation="2dp">
 
@@ -204,7 +204,7 @@
                             android:layout_width="28dp"
                             android:layout_height="28dp"
                             android:src="@drawable/ic_calories"
-                            app:tint="#F57C00" />
+                            app:tint="@color/icon_orange" />
 
                         <TextView
                             android:id="@+id/tvCalories"
@@ -248,7 +248,7 @@
                             android:layout_width="28dp"
                             android:layout_height="28dp"
                             android:src="@drawable/ic_timer"
-                            app:tint="#9C27B0" />
+                            app:tint="@color/icon_deep_purple" />
 
                         <TextView
                             android:id="@+id/tvActiveMinutes"
@@ -278,7 +278,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 
@@ -346,7 +346,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 

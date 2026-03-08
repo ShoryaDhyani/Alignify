@@ -16,12 +16,25 @@
         android:paddingBottom="32dp">
 
         <!-- Logo/App Icon Area -->
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_exercise_icon_blue">
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_fitness"
+                app:tint="@color/white" />
+
+        </FrameLayout>
 
         <!-- App Title -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="20dp"
             android:text="Alignify"
             android:textColor="@color/text_primary_dark"
             android:textSize="36sp"
@@ -32,7 +45,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Perfect your form, transform your fitness"
+            android:text="AI-Powered Fitness Coach"
             android:textAlignment="center"
             android:textColor="@color/text_secondary_dark"
             android:textSize="14sp" />
@@ -42,7 +55,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="40dp"
-            app:cardBackgroundColor="@color/white"
+            app:cardBackgroundColor="@color/card_background_light"
             app:cardCornerRadius="24dp"
             app:cardElevation="4dp">
 
@@ -142,8 +155,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:layout_marginTop="24dp"
-                    android:text="Sign In"
-                    android:textAllCaps="false"
+                    android:text="SIGN IN"
+                    android:textAllCaps="true"
                     android:textColor="@color/white"
                     android:textSize="16sp"
                     android:textStyle="bold"
@@ -195,7 +208,7 @@
             android:textAllCaps="false"
             android:textColor="@color/text_primary_dark"
             android:textSize="15sp"
-            app:backgroundTint="@color/white"
+            app:backgroundTint="@color/card_background_light"
             app:cornerRadius="16dp"
             app:icon="@drawable/ic_google"
             app:iconGravity="textStart"

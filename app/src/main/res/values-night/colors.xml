@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background -->
+    <color name="background_light">#0D0D0D</color>
+    <color name="surface_light">#252525</color>
+    <color name="overlay_background">#CC0D0D0D</color>
+
+    <!-- Text -->
+    <color name="text_primary_dark">#F0F0F0</color>
+    <color name="text_secondary_dark">#AAAAAA</color>
+    <color name="text_hint">#888888</color>
+    <color name="text_light_grey">#CCCCCC</color>
+    <color name="text_tertiary">#BBBBBB</color>
+    <color name="text_black_50">#80FFFFFF</color>
+
+    <!-- Input fields -->
+    <color name="input_background">#1E1E1E</color>
+
+    <!-- Cards -->
+    <color name="card_background">#1E1E1E</color>
+    <color name="card_background_light">#1A1A1A</color>
+
+    <!-- Activity Screen Card Colors (dark variants) -->
+    <color name="card_lime">#1B3A1F</color>
+    <color name="card_dark">#263238</color>
+    <color name="card_pink">#0D3A5A</color>
+    <color name="card_purple">#2A1F3A</color>
+    <color name="card_light_pink">#1B3A1F</color>
+    <color name="card_light_blue">#102A3A</color>
+
+    <!-- Activity History Card Colors -->
+    <color name="card_steps">#1B3A1F</color>
+    <color name="card_calories">#3A2A10</color>
+    <color name="card_water">#102A3A</color>
+
+    <!-- Additional UI -->
+    <color name="divider_light">#333333</color>
+
+    <!-- Quick Action Cards -->
+    <color name="card_workout">#1B3A1F</color>
+    <color name="card_running">#102A3A</color>
+    <color name="card_coach">#3A2A10</color>
+    <color name="card_select_blue">#102A3A</color>
+
+    <!-- Danger/destructive text (lighter red for dark bg contrast) -->
+    <color name="text_danger">#EF5350</color>
+
+    <!-- Streak -->
+    <color name="streak_inactive">#333333</color>
+
+    <!-- Switch -->
+    <color name="switch_track">#546E7A</color>
+</resources>

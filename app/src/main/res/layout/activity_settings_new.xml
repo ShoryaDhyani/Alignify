@@ -7,26 +7,35 @@
     android:orientation="vertical">
 
     <!-- Header -->
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="16dp"
-        android:text="Account"
-        android:textColor="@color/text_secondary_dark"
-        android:textSize="16sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp">
 
-    <!-- Title -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="8dp"
-        android:text="Settings"
-        android:textColor="@color/text_primary_dark"
-        android:textSize="28sp"
-        android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/btnBackSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/text_primary_dark" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="Settings"
+            android:textColor="@color/text_primary_dark"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -46,7 +55,7 @@
                 android:id="@+id/cardProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 
@@ -63,7 +72,7 @@
                         android:layout_height="64dp"
                         app:cardCornerRadius="32dp"
                         app:cardElevation="0dp"
-                        app:cardBackgroundColor="#E0E0E0">
+                        app:cardBackgroundColor="@color/divider_light">
 
                         <ImageView
                             android:id="@+id/ivProfileImage"
@@ -125,7 +134,7 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 
@@ -194,7 +203,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="76dp"
-                        android:background="#E0E0E0" />
+                        android:background="@color/divider_light" />
 
                     <!-- Calorie Goal -->
                     <LinearLayout
@@ -216,7 +225,7 @@
                                 android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_calories"
-                                app:tint="#F57C00" />
+                                app:tint="@color/icon_orange" />
 
                         </FrameLayout>
 
@@ -256,7 +265,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="76dp"
-                        android:background="#E0E0E0" />
+                        android:background="@color/divider_light" />
 
                     <!-- Water Goal -->
                     <LinearLayout
@@ -333,7 +342,7 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 
@@ -402,7 +411,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="76dp"
-                        android:background="#E0E0E0" />
+                        android:background="@color/divider_light" />
 
                     <!-- Water Reminders -->
                     <LinearLayout
@@ -423,7 +432,7 @@
                                 android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_timer"
-                                app:tint="#7B1FA2" />
+                                app:tint="@color/icon_purple" />
 
                         </FrameLayout>
 
@@ -477,7 +486,7 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/card_background_light"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="2dp">
 
@@ -506,7 +515,7 @@
                                 android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_profile"
-                                app:tint="#E65100" />
+                                app:tint="@color/icon_deep_orange" />
 
                         </FrameLayout>
 
@@ -531,7 +540,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="76dp"
-                        android:background="#E0E0E0" />
+                        android:background="@color/divider_light" />
 
                     <!-- Logout -->
                     <LinearLayout
@@ -553,7 +562,7 @@
                                 android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_logout"
-                                app:tint="#D32F2F" />
+                                app:tint="@color/icon_red" />
 
                         </FrameLayout>
 
@@ -563,8 +572,408 @@
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
                             android:text="Logout"
-                            android:textColor="#C62828"
+                            android:textColor="@color/text_danger"
                             android:textSize="16sp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Notifications Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"
+                android:text="Notifications"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/card_background_light"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Workout Reminders -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_exercise_icon_green">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_notifications"
+                                app:tint="@color/white" />
+
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Workout Reminders"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="16sp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchWorkoutReminders"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="76dp"
+                        android:background="@color/divider_light" />
+
+                    <!-- Daily Summary -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_exercise_icon_blue">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_activity"
+                                app:tint="@color/white" />
+
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Daily Summary"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="16sp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchDailySummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="76dp"
+                        android:background="@color/divider_light" />
+
+                    <!-- Inactivity Alert -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_tag_orange">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_timer"
+                                app:tint="@color/icon_deep_orange" />
+
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Inactivity Alert"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="16sp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchInactivityAlert"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="false" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Appearance Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"
+                android:text="Appearance"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/card_background_light"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_tag_gray">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_settings"
+                            app:tint="@color/text_primary_dark" />
+
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:text="Dark Mode"
+                        android:textColor="@color/text_primary_dark"
+                        android:textSize="16sp" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchDarkMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- About Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"
+                android:text="About"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/card_background_light"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Rate App -->
+                    <LinearLayout
+                        android:id="@+id/settingRateApp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_tag_lime">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_trophy"
+                                app:tint="@color/star_yellow" />
+
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:text="Rate App"
+                            android:textColor="@color/text_primary_dark"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/text_secondary_dark" />
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="76dp"
+                        android:background="@color/divider_light" />
+
+                    <!-- Privacy Policy -->
+                    <LinearLayout
+                        android:id="@+id/settingPrivacyPolicy"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_exercise_icon_blue">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_lock"
+                                app:tint="@color/white" />
+
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:text="Privacy Policy"
+                            android:textColor="@color/text_primary_dark"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/text_secondary_dark" />
+
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="76dp"
+                        android:background="@color/divider_light" />
+
+                    <!-- Terms of Service -->
+                    <LinearLayout
+                        android:id="@+id/settingTerms"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <FrameLayout
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_tag_gray">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_info"
+                                app:tint="@color/text_primary_dark" />
+
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:text="Terms of Service"
+                            android:textColor="@color/text_primary_dark"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/text_secondary_dark" />
 
                     </LinearLayout>
 
@@ -580,7 +989,7 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginBottom="16dp"
                 android:gravity="center"
-                android:text="Alignify v1.0.0"
+                android:text="Alignify v2.0.0"
                 android:textColor="@color/text_secondary_dark"
                 android:textSize="12sp" />
 

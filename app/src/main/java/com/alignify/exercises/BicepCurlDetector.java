@@ -28,7 +28,7 @@ public class BicepCurlDetector extends ExerciseDetector {
 
     private String previousStage = "down";
     private String currentStage = "down";
-    private float minAngleReached = 180f;
+    private float minAngleReached = Float.MAX_VALUE;
 
     public BicepCurlDetector(Context context) {
         super(context, "bicep_model.tflite");
@@ -89,7 +89,7 @@ public class BicepCurlDetector extends ExerciseDetector {
             }
 
             _repCount++;
-            minAngleReached = 180f;
+            minAngleReached = Float.MAX_VALUE;
         }
 
         // Check for loose upper arm
@@ -129,13 +129,24 @@ public class BicepCurlDetector extends ExerciseDetector {
     }
 
     private String checkLooseUpperArm(PoseLandmarkerResult result) {
-        // Check if upper arm stays close to torso
+        // Check both arms to detect loose upper arm regardless of orientation
         LandmarkUtils.Point2D leftShoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_SHOULDER);
         LandmarkUtils.Point2D leftElbow = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_ELBOW);
         LandmarkUtils.Point2D leftHip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_HIP);
 
         if (leftShoulder != null && leftElbow != null && leftHip != null) {
             float angle = LandmarkUtils.calculateAngle(leftHip, leftShoulder, leftElbow);
+            if (angle > LOOSE_ARM_ANGLE_THRESHOLD) {
+                return "Keep upper arm still";
+            }
+        }
+
+        LandmarkUtils.Point2D rightShoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_SHOULDER);
+        LandmarkUtils.Point2D rightElbow = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_ELBOW);
+        LandmarkUtils.Point2D rightHip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_HIP);
+
+        if (rightShoulder != null && rightElbow != null && rightHip != null) {
+            float angle = LandmarkUtils.calculateAngle(rightHip, rightShoulder, rightElbow);
             if (angle > LOOSE_ARM_ANGLE_THRESHOLD) {
                 return "Keep upper arm still";
             }
@@ -149,6 +160,6 @@ public class BicepCurlDetector extends ExerciseDetector {
         super.reset();
         previousStage = "down";
         currentStage = "down";
-        minAngleReached = 180f;
+        minAngleReached = Float.MAX_VALUE;
     }
 }

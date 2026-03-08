@@ -7,6 +7,8 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.alignify.engine.CaloriesEngine;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -21,10 +23,12 @@ import java.util.Locale;
  * - Sleep tracking
  * - Exercise reps
  * 
- * Data is cached locally in SharedPreferences for speed and synced to Firebase Firestore
+ * Data is cached locally in SharedPreferences for speed and synced to Firebase
+ * Firestore
  * for persistence across devices.
  * 
- * All activities should use this manager instead of directly accessing SharedPreferences
+ * All activities should use this manager instead of directly accessing
+ * SharedPreferences
  * or Firestore to ensure data consistency.
  */
 public class FitnessDataManager {
@@ -112,6 +116,7 @@ public class FitnessDataManager {
 
     /**
      * Check if it's a new day and reset daily counters.
+     * Snapshots yesterday's data before resetting to avoid re-entrancy data loss.
      */
     private void checkAndResetForNewDay() {
         String today = getTodayDateString();
@@ -119,12 +124,25 @@ public class FitnessDataManager {
 
         if (!today.equals(lastDate)) {
             Log.d(TAG, "New day detected, resetting daily counters");
-            // Save yesterday's data to Firestore before resetting
-            if (!lastDate.isEmpty()) {
-                syncToFirestore(lastDate);
-            }
-            
-            // Reset daily counters
+
+            // Snapshot yesterday's data BEFORE resetting to avoid re-entrancy
+            // (syncToFirestore calls getters which re-enter this method)
+            DailyActivity yesterday = new DailyActivity(lastDate);
+            yesterday.setSteps(prefs.getInt(KEY_STEPS_TODAY, 0));
+            yesterday.setCalories(prefs.getInt(KEY_CALORIES_TODAY, 0));
+            yesterday.setDistance(prefs.getFloat(KEY_DISTANCE_TODAY, 0f));
+            yesterday.setActiveMinutes(prefs.getInt(KEY_ACTIVE_MINUTES_TODAY, 0));
+            yesterday.setWaterCups(prefs.getInt(KEY_WATER_CUPS, 0));
+            yesterday.setWaterGoal(prefs.getInt(KEY_WATER_GOAL, DEFAULT_WATER_GOAL));
+            yesterday.setSleepHours(prefs.getFloat(KEY_SLEEP_HOURS, 0f));
+            yesterday.setSquatReps(prefs.getInt(KEY_SQUAT_REPS, 0));
+            yesterday.setBicepCurlReps(prefs.getInt(KEY_BICEP_CURL_REPS, 0));
+            yesterday.setLungeReps(prefs.getInt(KEY_LUNGE_REPS, 0));
+            yesterday.setPlankSeconds(prefs.getInt(KEY_PLANK_SECONDS, 0));
+            yesterday.setWorkoutsCount(prefs.getInt(KEY_WORKOUTS_COUNT, 0));
+            yesterday.setTotalWorkoutDuration(prefs.getInt(KEY_TOTAL_WORKOUT_DURATION, 0));
+
+            // Reset daily counters and update date FIRST (prevents re-entrancy)
             prefs.edit()
                     .putInt(KEY_STEPS_TODAY, 0)
                     .putInt(KEY_CALORIES_TODAY, 0)
@@ -140,6 +158,11 @@ public class FitnessDataManager {
                     .putInt(KEY_TOTAL_WORKOUT_DURATION, 0)
                     .putString(KEY_LAST_SYNC_DATE, today)
                     .apply();
+
+            // THEN sync yesterday's snapshot (date already updated, no re-entrancy)
+            if (!lastDate.isEmpty()) {
+                UserRepository.getInstance().saveDailyActivity(yesterday, null);
+            }
         }
     }
 
@@ -168,20 +191,21 @@ public class FitnessDataManager {
      * Set step count for today.
      */
     public void setStepsToday(int steps) {
-        prefs.edit().putInt(KEY_STEPS_TODAY, steps).apply();
-        stepsLiveData.postValue(steps);
-        
         // Auto-calculate calories and distance
         int calories = calculateCaloriesFromSteps(steps);
         float distance = calculateDistanceFromSteps(steps);
-        
+
+        // Batch all writes in a single transaction to avoid race conditions
         prefs.edit()
+                .putInt(KEY_STEPS_TODAY, steps)
                 .putInt(KEY_CALORIES_TODAY, calories)
                 .putFloat(KEY_DISTANCE_TODAY, distance)
                 .apply();
+
+        stepsLiveData.postValue(steps);
         caloriesLiveData.postValue(calories);
         distanceLiveData.postValue(distance);
-        
+
         // Trigger sync if interval passed
         scheduleSyncIfNeeded();
     }
@@ -370,8 +394,9 @@ public class FitnessDataManager {
      * Set water cups consumed today.
      */
     public void setWaterCupsToday(int cups) {
-        prefs.edit().putInt(KEY_WATER_CUPS, Math.max(0, cups)).apply();
-        waterCupsLiveData.postValue(cups);
+        int clamped = Math.max(0, cups);
+        prefs.edit().putInt(KEY_WATER_CUPS, clamped).apply();
+        waterCupsLiveData.postValue(clamped);
         scheduleSyncIfNeeded();
     }
 
@@ -561,18 +586,18 @@ public class FitnessDataManager {
     public void recordWorkout(int durationSeconds, int caloriesBurned) {
         int currentCount = getWorkoutsCountToday();
         int currentDuration = getTotalWorkoutDurationToday();
-        
+
         prefs.edit()
                 .putInt(KEY_WORKOUTS_COUNT, currentCount + 1)
                 .putInt(KEY_TOTAL_WORKOUT_DURATION, currentDuration + durationSeconds)
                 .apply();
-        
+
         // Add active minutes
         addActiveMinutes(durationSeconds / 60);
-        
+
         // Add calories
         addCalories(caloriesBurned);
-        
+
         // Sync to Firestore
         syncToFirestore();
     }
@@ -600,18 +625,17 @@ public class FitnessDataManager {
                 addPlankSeconds(durationSeconds);
                 break;
         }
-        
+
         recordWorkout(durationSeconds, caloriesBurned);
     }
 
     // ============ Calculation Helpers ============
 
     /**
-     * Calculate calories from steps.
-     * Uses formula: calories = steps * 0.04 (average for moderate walking)
+     * Calculate calories from steps using weight-aware CaloriesEngine.
      */
     private int calculateCaloriesFromSteps(int steps) {
-        return (int) (steps * 0.04);
+        return CaloriesEngine.getInstance(context).getCaloriesFromSteps(steps);
     }
 
     /**
@@ -645,10 +669,12 @@ public class FitnessDataManager {
      * Sync data for a specific date to Firestore.
      */
     private void syncToFirestore(String dateKey) {
-        if (isSyncing) return;
-        
+        long now = System.currentTimeMillis();
+        if (isSyncing && (now - lastSyncTime) < 30000)
+            return; // Allow retry after 30s timeout
+
         isSyncing = true;
-        lastSyncTime = System.currentTimeMillis();
+        lastSyncTime = now;
 
         DailyActivity activity = new DailyActivity(dateKey);
         activity.setSteps(getStepsToday());
@@ -690,8 +716,7 @@ public class FitnessDataManager {
                 getActiveTimeGoal(),
                 getWaterGoal(),
                 getSleepGoal(),
-                null
-        );
+                null);
     }
 
     /**
@@ -703,7 +728,7 @@ public class FitnessDataManager {
                 // Merge with local data - take the higher values
                 int localSteps = getStepsToday();
                 int firestoreSteps = activity.getSteps();
-                
+
                 if (firestoreSteps > localSteps) {
                     prefs.edit()
                             .putInt(KEY_STEPS_TODAY, firestoreSteps)
@@ -714,7 +739,7 @@ public class FitnessDataManager {
                     caloriesLiveData.postValue(activity.getCalories());
                     distanceLiveData.postValue(activity.getDistance());
                 }
-                
+
                 // For other metrics, take Firestore values if local is 0
                 if (getActiveMinutesToday() == 0 && activity.getActiveMinutes() > 0) {
                     setActiveMinutesToday(activity.getActiveMinutes());
@@ -722,10 +747,10 @@ public class FitnessDataManager {
                 if (getWaterCupsToday() == 0 && activity.getWaterCups() > 0) {
                     setWaterCupsToday(activity.getWaterCups());
                 }
-                
+
                 Log.d(TAG, "Loaded and merged data from Firestore");
             }
-            
+
             if (listener != null) {
                 listener.onDataLoaded();
             }

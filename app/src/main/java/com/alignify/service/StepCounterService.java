@@ -22,6 +22,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.alignify.DashboardActivity;
 import com.alignify.R;
 import com.alignify.data.UserRepository;
+import com.alignify.engine.CaloriesEngine;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -153,9 +154,14 @@ public class StepCounterService extends Service implements SensorEventListener {
         if (!currentDate.equals(lastDate)) {
             Log.d(TAG, "New day detected, resetting daily baseline");
             dailyBaseline = totalStepsSinceReboot;
+            totalStepsBeforeReboot = 0; // Reset reboot accumulator for new day
+            // Clear lastKnownSteps to prevent stale reboot detection after overnight reboot
+            lastKnownSteps = -1;
             editor.putString(KEY_LAST_DATE, currentDate);
             editor.putInt(KEY_DAILY_BASELINE, dailyBaseline);
             editor.putInt(KEY_STEPS_TODAY, 0); // Reset today's steps
+            editor.putInt(KEY_TOTAL_STEPS_BEFORE_REBOOT, 0);
+            editor.putInt(KEY_LAST_KNOWN_STEPS, -1);
             stepsToday = 0;
         }
 
@@ -183,7 +189,7 @@ public class StepCounterService extends Service implements SensorEventListener {
 
         // Calculate today's steps
         int stepsSinceBaseline = totalStepsSinceReboot - dailyBaseline;
-        stepsToday = stepsSinceBaseline + (currentDate.equals(lastDate) ? 0 : totalStepsBeforeReboot);
+        stepsToday = stepsSinceBaseline + totalStepsBeforeReboot;
 
         // Ensure steps are never negative
         if (stepsToday < 0)
@@ -215,8 +221,8 @@ public class StepCounterService extends Service implements SensorEventListener {
         long timeDelta = now - lastSyncTime;
 
         if (stepDelta >= SYNC_STEP_THRESHOLD || timeDelta >= SYNC_TIME_THRESHOLD) {
-            // Calculate approximate calories (0.04 cal per step is a rough estimate)
-            int calories = (int) (steps * 0.04);
+            // Use CaloriesEngine for weight-aware calorie calculation
+            int calories = CaloriesEngine.getInstance(this).getCaloriesFromSteps(steps);
             // Approximate distance in km (average stride ~0.7m)
             float distance = steps * 0.0007f;
 
@@ -294,7 +300,7 @@ public class StepCounterService extends Service implements SensorEventListener {
      * Returns the current date in yyyy-MM-dd format for daily reset tracking.
      */
     private String getCurrentDate() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         return sdf.format(new Date());
     }
 

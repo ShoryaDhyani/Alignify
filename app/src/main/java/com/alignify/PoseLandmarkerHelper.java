@@ -115,8 +115,9 @@ public class PoseLandmarkerHelper {
      * Results are delivered via the listener callback.
      */
     public void detectLiveStream(MPImage imageProxy, long frameTime) {
-        if (poseLandmarker != null) {
-            poseLandmarker.detectAsync(imageProxy, frameTime);
+        PoseLandmarker lm = poseLandmarker; // Local snapshot to avoid TOCTOU race
+        if (lm != null) {
+            lm.detectAsync(imageProxy, frameTime);
         }
     }
 

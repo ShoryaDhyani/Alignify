@@ -15,7 +15,7 @@
         android:src="@drawable/ic_chatbot"
         android:background="@drawable/bg_circle_accent"
         android:padding="6dp"
-        app:tint="@color/black"
+        app:tint="@color/text_primary_dark"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -25,7 +25,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="48dp"
-        app:cardBackgroundColor="@color/surface"
+        app:cardBackgroundColor="@color/card_background_light"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -44,7 +44,7 @@
                 android:id="@+id/text_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/text_primary_dark"
                 android:textSize="15sp"
                 android:lineSpacingMultiplier="1.2" />
 
@@ -54,7 +54,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/text_secondary_dark"
                 android:textSize="11sp"
                 android:visibility="gone" />
 
@@ -63,7 +63,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/text_secondary_dark"
                 android:textSize="11sp" />
 
         </LinearLayout>

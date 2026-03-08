@@ -49,6 +49,17 @@
 
             </LinearLayout>
 
+            <!-- Notification Bell -->
+            <ImageView
+                android:id="@+id/btnNotifications"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Notifications"
+                android:padding="8dp"
+                android:src="@drawable/ic_notifications"
+                app:tint="@color/text_primary_dark" />
+
             <!-- Menu Button -->
             <ImageView
                 android:id="@+id/btnMenu"
@@ -82,7 +93,7 @@
                     android:id="@+id/profileCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardBackgroundColor="@color/white"
+                    app:cardBackgroundColor="@color/card_background_light"
                     app:cardCornerRadius="20dp"
                     app:cardElevation="2dp">
 
@@ -99,7 +110,7 @@
                             android:layout_height="60dp"
                             app:cardCornerRadius="30dp"
                             app:cardElevation="0dp"
-                            app:cardBackgroundColor="#E0E0E0">
+                            app:cardBackgroundColor="@color/divider_light">
 
                             <ImageView
                                 android:id="@+id/ivProfileImage"
@@ -120,7 +131,8 @@
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:orientation="horizontal">
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
 
                                 <TextView
                                     android:layout_width="wrap_content"
@@ -138,16 +150,28 @@
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
 
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="Normal"
+                                    android:textColor="@color/streak_active"
+                                    android:textSize="12sp" />
+
                             </LinearLayout>
 
                             <TextView
                                 android:id="@+id/fitnessLevel"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="Fitness Level: Active"
-                                android:textColor="#4CAF50"
-                                android:textSize="12sp" />
+                                android:layout_marginTop="6dp"
+                                android:background="@drawable/bg_tag_lime"
+                                android:paddingHorizontal="12dp"
+                                android:paddingVertical="4dp"
+                                android:text="Intermediate"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
 
                         </LinearLayout>
 
@@ -155,43 +179,7 @@
 
                 </androidx.cardview.widget.CardView>
 
-                <!-- Start Workout Button -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/btnStartCorrection"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    app:cardBackgroundColor="@color/card_lime"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="4dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:orientation="horizontal"
-                        android:padding="20dp">
-
-                        <ImageView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:src="@drawable/ic_fitness"
-                            app:tint="@color/text_primary_dark" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:text="Start Posture Correction"
-                            android:textColor="@color/text_primary_dark"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Today's Stats Section -->
+                <!-- Today's Activity Section Title -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -201,142 +189,85 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
-                <!-- Step Counter Card -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/stepCounterCard"
+                <!-- Quick Stats Row: Steps + Calories + Distance -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    app:cardBackgroundColor="@color/white"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:padding="20dp">
-
-                        <!-- Header Row -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:src="@drawable/ic_steps"
-                                app:tint="@color/card_lime" />
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="12dp"
-                                android:layout_weight="1"
-                                android:text="Today's Steps"
-                                android:textColor="@color/text_primary_dark"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <ImageButton
-                                android:id="@+id/btnResetSteps"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:contentDescription="Reset steps"
-                                android:src="@drawable/ic_refresh"
-                                app:tint="@color/text_secondary_dark" />
-
-                        </LinearLayout>
-
-                        <!-- Steps Display -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            android:gravity="center"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:id="@+id/stepsValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textColor="@color/accent"
-                                android:textSize="42sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="steps"
-                                android:textColor="@color/text_secondary_dark"
-                                android:textSize="16sp" />
-
-                        </LinearLayout>
-
-                        <!-- Goal Progress -->
-                        <ProgressBar
-                            android:id="@+id/stepProgressBar"
-                            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
-                            android:layout_width="match_parent"
-                            android:layout_height="8dp"
-                            android:layout_marginTop="12dp"
-                            android:max="10000"
-                            android:progress="0"
-                            android:progressDrawable="@drawable/progress_steps" />
-
-                        <TextView
-                            android:id="@+id/stepGoalText"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textAlignment="center"
-                            android:textColor="@color/text_secondary_dark"
-                            android:textSize="12sp" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Quick Stats Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="119dp"
-                    android:layout_marginTop="12dp"
                     android:orientation="horizontal">
 
-                    <!-- Calories Card -->
+                    <!-- Steps Mini Card -->
                     <androidx.cardview.widget.CardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
+                        android:layout_marginEnd="6dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="@color/card_light_pink"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp">
+                        app:cardElevation="1dp">
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:padding="16dp">
+                            android:padding="14dp">
 
                             <ImageView
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_steps"
+                                app:tint="@color/streak_active" />
+
+                            <TextView
+                                android:id="@+id/stepsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="0"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Steps"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="11sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- Calories Mini Card -->
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/card_calories"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="14dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
                                 android:src="@drawable/ic_calories"
-                                app:tint="#F57C00" />
+                                app:tint="@color/icon_orange" />
 
                             <TextView
                                 android:id="@+id/tvCalories"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
+                                android:layout_marginTop="6dp"
                                 android:text="0"
                                 android:textColor="@color/text_primary_dark"
                                 android:textSize="20sp"
@@ -347,32 +278,32 @@
                                 android:layout_height="wrap_content"
                                 android:text="Calories"
                                 android:textColor="@color/text_secondary_dark"
-                                android:textSize="12sp" />
+                                android:textSize="11sp" />
 
                         </LinearLayout>
 
                     </androidx.cardview.widget.CardView>
 
-                    <!-- Distance Card -->
+                    <!-- Distance Mini Card -->
                     <androidx.cardview.widget.CardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="@color/card_light_blue"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp">
+                        app:cardElevation="1dp">
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:padding="16dp">
+                            android:padding="14dp">
 
                             <ImageView
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
                                 android:src="@drawable/ic_distance"
                                 app:tint="@color/water_blue" />
 
@@ -380,7 +311,7 @@
                                 android:id="@+id/tvDistance"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
+                                android:layout_marginTop="6dp"
                                 android:text="0.0 km"
                                 android:textColor="@color/text_primary_dark"
                                 android:textSize="20sp"
@@ -390,6 +321,382 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Distance"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="11sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                </LinearLayout>
+
+                <!-- Step Goal Progress -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/stepCounterCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="@color/card_background_light"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@drawable/ic_steps"
+                            app:tint="@color/card_lime" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="12dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <ProgressBar
+                                android:id="@+id/stepProgressBar"
+                                style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="8dp"
+                                android:max="10000"
+                                android:progress="0"
+                                android:progressDrawable="@drawable/progress_steps" />
+
+                            <TextView
+                                android:id="@+id/stepGoalText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="0 / 10,000 goal"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="12sp" />
+
+                        </LinearLayout>
+
+                        <ImageButton
+                            android:id="@+id/btnResetSteps"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Reset steps"
+                            android:src="@drawable/ic_refresh"
+                            app:tint="@color/text_secondary_dark" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Quick Actions Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:text="Quick Actions"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <!-- Start Workout Card -->
+                    <androidx.cardview.widget.CardView
+                        android:id="@+id/btnStartCorrection"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/card_workout"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <FrameLayout
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@drawable/bg_exercise_icon_green">
+
+                                <ImageView
+                                    android:layout_width="28dp"
+                                    android:layout_height="28dp"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_fitness"
+                                    app:tint="@color/white" />
+
+                            </FrameLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:text="Start\nWorkout"
+                                android:textAlignment="center"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="AI Form Analysis"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="10sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- Start Running Card -->
+                    <androidx.cardview.widget.CardView
+                        android:id="@+id/btnStartRunning"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/card_running"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <FrameLayout
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@drawable/bg_exercise_icon_blue">
+
+                                <ImageView
+                                    android:layout_width="28dp"
+                                    android:layout_height="28dp"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_run"
+                                    app:tint="@color/white" />
+
+                            </FrameLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:text="Start\nRunning"
+                                android:textAlignment="center"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="GPS Tracking"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="10sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- Talk to Coach Card -->
+                    <androidx.cardview.widget.CardView
+                        android:id="@+id/btnTalkCoach"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/card_coach"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <FrameLayout
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@drawable/bg_tag_orange">
+
+                                <ImageView
+                                    android:layout_width="28dp"
+                                    android:layout_height="28dp"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_chatbot"
+                                    app:tint="@color/white" />
+
+                            </FrameLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:text="AI\nCoach"
+                                android:textAlignment="center"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Fitness Coach"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="10sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                </LinearLayout>
+
+                <!-- Weekly Streak Section -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    app:cardBackgroundColor="@color/card_background_light"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Weekly Streak"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:src="@drawable/ic_flame"
+                                app:tint="@color/calories_orange" />
+
+                            <TextView
+                                android:id="@+id/tvStreakCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:text="0 Days"
+                                android:textColor="@color/calories_orange"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+
+                        <!-- Week Days -->
+                        <LinearLayout
+                            android:id="@+id/weekStreakContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <!-- Days will be populated dynamically or static -->
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="M" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="T" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="W" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="T" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="F" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="S" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+                            <TextView android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="S" android:textSize="12sp" android:textColor="@color/text_secondary_dark" android:background="@drawable/bg_streak_inactive" android:layout_marginStart="6dp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Recent Activity Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:text="Recent Activity"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/recentActivityContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical">
+
+                    <!-- Placeholder: populated dynamically -->
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="@color/card_background_light"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="24dp">
+
+                            <ImageView
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:src="@drawable/ic_fitness"
+                                app:tint="@color/text_secondary_dark"
+                                android:alpha="0.4" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="No recent activity"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="14sp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Start a workout to see your history"
                                 android:textColor="@color/text_secondary_dark"
                                 android:textSize="12sp" />
 
@@ -429,7 +736,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="@color/white"
+        android:background="@color/card_background_light"
         android:fitsSystemWindows="true"
         app:headerLayout="@layout/nav_header"
         app:itemIconTint="@color/accent"

@@ -162,6 +162,7 @@ public class CaloriesEngine {
      * @param durationSeconds Duration in seconds
      */
     public int getCaloriesFromExercise(String exerciseType, int durationSeconds) {
+        if (exerciseType == null) return 0;
         float met;
         switch (exerciseType.toLowerCase()) {
             case "bicep_curl":

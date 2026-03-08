@@ -8,14 +8,30 @@
 
     <!-- Header -->
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="16dp"
-        android:text="Activity"
-        android:textColor="@color/text_secondary_dark"
-        android:textSize="18sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Analytics"
+            android:textColor="@color/text_primary_dark"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_calendar"
+            app:tint="@color/text_secondary_dark" />
+
+    </LinearLayout>
 
     <!-- Month/Year Title -->
     <TextView
@@ -452,6 +468,160 @@
                 </LinearLayout>
 
             </LinearLayout>
+
+                <!-- This Week's Activity Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="This Week's Activity"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/card_background_light"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Daily Avg:"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tvWeeklyAvg"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 cal"
+                                android:textColor="@color/text_primary_dark"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+
+                        <!-- Simple bar chart placeholder -->
+                        <LinearLayout
+                            android:id="@+id/weeklyChartContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="80dp"
+                            android:layout_marginTop="12dp"
+                            android:gravity="bottom|center_horizontal"
+                            android:orientation="horizontal">
+
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="20dp" android:background="@drawable/bg_tag_lime" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="M" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="30dp" android:background="@drawable/bg_tag_lime" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="T" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="40dp" android:background="@drawable/bg_tag_lime" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="W" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="25dp" android:background="@drawable/bg_tag_lime" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="T" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="35dp" android:background="@drawable/bg_tag_lime" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="F" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="15dp" android:background="@drawable/bg_streak_inactive" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="S" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+                            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="bottom|center_horizontal" android:orientation="vertical">
+                                <View android:layout_width="20dp" android:layout_height="10dp" android:background="@drawable/bg_streak_inactive" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="S" android:textSize="10sp" android:textColor="@color/text_secondary_dark" android:layout_marginTop="4dp" />
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Recent Workouts Section -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Recent Workouts"
+                        android:textColor="@color/text_primary_dark"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="View All"
+                        android:textColor="@color/accent"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/recentWorkoutsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
+
+                    <!-- Placeholder: populated dynamically -->
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="@color/card_background_light"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="20dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="No workouts yet"
+                                android:textColor="@color/text_secondary_dark"
+                                android:textSize="14sp" />
+
+                        </LinearLayout>
+
+                    </androidx.cardview.widget.CardView>
+
+                </LinearLayout>
 
         </LinearLayout>
 

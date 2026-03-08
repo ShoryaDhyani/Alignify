@@ -336,7 +336,7 @@ public class ActivityActivity extends AppCompatActivity {
 
                         // Y axis
                         chart.getAxisLeft().setDrawGridLines(true);
-                        chart.getAxisLeft().setGridColor(Color.parseColor("#EEEEEE"));
+                        chart.getAxisLeft().setGridColor(getColor(R.color.divider_light));
                         chart.getAxisLeft().setTextColor(getColor(R.color.text_secondary_dark));
                         chart.getAxisLeft().setAxisMinimum(0f);
                         chart.getAxisRight().setEnabled(false);
@@ -416,7 +416,7 @@ public class ActivityActivity extends AppCompatActivity {
 
                         // Y axis
                         chart.getAxisLeft().setDrawGridLines(true);
-                        chart.getAxisLeft().setGridColor(Color.parseColor("#EEEEEE"));
+                        chart.getAxisLeft().setGridColor(getColor(R.color.divider_light));
                         chart.getAxisLeft().setTextColor(getColor(R.color.text_secondary_dark));
                         chart.getAxisLeft().setAxisMinimum(0f);
                         chart.getAxisRight().setEnabled(false);
@@ -618,13 +618,13 @@ public class ActivityActivity extends AppCompatActivity {
 
         // Motivation text
         if (progressPercent >= 100) {
-            tvStepMotivation.setText("🎉 Goal achieved! You're a champion!");
+            tvStepMotivation.setText("Goal achieved! You're a champion!");
         } else if (progressPercent >= 75) {
-            tvStepMotivation.setText("💪 Almost there! " + (goalSteps - currentSteps) + " steps to go!");
+            tvStepMotivation.setText("Almost there! " + (goalSteps - currentSteps) + " steps to go!");
         } else if (progressPercent >= 50) {
-            tvStepMotivation.setText("🚶 Halfway there! Keep moving!");
+            tvStepMotivation.setText("Halfway there! Keep moving!");
         } else if (progressPercent >= 25) {
-            tvStepMotivation.setText("👟 Great start! Keep it up!");
+            tvStepMotivation.setText("Great start! Keep it up!");
         } else {
             tvStepMotivation.setText("🌅 Start your day with a walk!");
         }

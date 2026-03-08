@@ -19,9 +19,9 @@ import java.util.List;
 public class PlankDetector extends ExerciseDetector {
 
     // Hip angle thresholds (shoulder-hip-ankle alignment)
+    // calculateAngle() returns 0-180, so thresholds must be in that range
     private static final float HIP_ANGLE_IDEAL = 170f; // Nearly straight
-    private static final float HIP_ANGLE_HIGH_THRESHOLD = 155f;
-    private static final float HIP_ANGLE_LOW_THRESHOLD = 185f;
+    private static final float HIP_ANGLE_LOW_THRESHOLD = 160f; // Hips sagging (angle at hip decreases)
 
     // Shoulder-wrist alignment threshold
     private static final float SHOULDER_WRIST_THRESHOLD = 0.1f;
@@ -121,42 +121,67 @@ public class PlankDetector extends ExerciseDetector {
     }
 
     private boolean checkPlankPosition(PoseLandmarkerResult result) {
-        // Check if key landmarks are visible
-        LandmarkUtils.Point2D leftShoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_SHOULDER);
-        LandmarkUtils.Point2D leftHip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_HIP);
-        LandmarkUtils.Point2D leftAnkle = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_ANKLE);
+        // Check left side first, fall back to right side
+        LandmarkUtils.Point2D shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_SHOULDER);
+        LandmarkUtils.Point2D hip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_HIP);
+        LandmarkUtils.Point2D ankle = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_ANKLE);
 
-        if (leftShoulder == null || leftHip == null || leftAnkle == null) {
+        if (shoulder == null || hip == null || ankle == null) {
+            shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_SHOULDER);
+            hip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_HIP);
+            ankle = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_ANKLE);
+        }
+
+        if (shoulder == null || hip == null || ankle == null) {
             return false;
         }
 
         // Check if body is roughly horizontal (plank position)
-        float shoulderHipDiff = Math.abs(leftShoulder.y - leftHip.y);
-        float hipAnkleDiff = Math.abs(leftHip.y - leftAnkle.y);
+        float shoulderHipDiff = Math.abs(shoulder.y - hip.y);
+        float hipAnkleDiff = Math.abs(hip.y - ankle.y);
 
         // In plank, these should be relatively small
         return shoulderHipDiff < 0.3f && hipAnkleDiff < 0.3f;
     }
 
     private String checkHipAlignment(PoseLandmarkerResult result) {
-        // Calculate hip angle using shoulder, hip, and ankle
-        Float leftHipAngle = LandmarkUtils.calculateHipAngle(result, true);
-        Float rightHipAngle = LandmarkUtils.calculateHipAngle(result, false);
+        // Use shoulder-hip-ankle positions to detect alignment
+        // The angle alone can't distinguish hips-too-high from hips-sagging
+        // since both cause the angle to decrease from 180
+        LandmarkUtils.Point2D shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_SHOULDER);
+        LandmarkUtils.Point2D hip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_HIP);
+        LandmarkUtils.Point2D ankle = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_ANKLE);
 
-        Float hipAngle;
-        if (leftHipAngle != null && rightHipAngle != null) {
-            hipAngle = (leftHipAngle + rightHipAngle) / 2;
-        } else if (leftHipAngle != null) {
-            hipAngle = leftHipAngle;
-        } else if (rightHipAngle != null) {
-            hipAngle = rightHipAngle;
-        } else {
+        if (shoulder == null || hip == null || ankle == null) {
+            shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_SHOULDER);
+            hip = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_HIP);
+            ankle = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_ANKLE);
+        }
+
+        if (shoulder == null || hip == null || ankle == null) {
             return null;
         }
 
-        if (hipAngle < HIP_ANGLE_HIGH_THRESHOLD) {
+        // Check hip angle for overall form quality
+        float hipAngle = LandmarkUtils.calculateAngle(shoulder, hip, ankle);
+        if (hipAngle > HIP_ANGLE_LOW_THRESHOLD) {
+            // Form is acceptable
+            return null;
+        }
+
+        // Form is off - determine direction using vertical position
+        // In normalized coords, y increases downward
+        // Interpolate expected hip y on the shoulder-ankle line
+        float dx = ankle.x - shoulder.x;
+        float t = (Math.abs(dx) > 0.001f) ? (hip.x - shoulder.x) / dx : 0.5f;
+        float expectedY = shoulder.y + t * (ankle.y - shoulder.y);
+        float deviation = hip.y - expectedY;
+
+        // deviation > 0 means hip is below the line (sagging)
+        // deviation < 0 means hip is above the line (piked up)
+        if (deviation < -0.03f) {
             return "Lower your hips";
-        } else if (hipAngle > HIP_ANGLE_LOW_THRESHOLD) {
+        } else if (deviation > 0.03f) {
             return "Raise your hips";
         }
 
@@ -166,6 +191,11 @@ public class PlankDetector extends ExerciseDetector {
     private String checkShoulderAlignment(PoseLandmarkerResult result) {
         LandmarkUtils.Point2D shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_SHOULDER);
         LandmarkUtils.Point2D wrist = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.LEFT_WRIST);
+
+        if (shoulder == null || wrist == null) {
+            shoulder = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_SHOULDER);
+            wrist = LandmarkUtils.getPoint2D(result, LandmarkUtils.Landmarks.RIGHT_WRIST);
+        }
 
         if (shoulder != null && wrist != null) {
             // Check if shoulders are stacked over wrists

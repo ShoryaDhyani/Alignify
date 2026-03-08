@@ -35,6 +35,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.databinding.ActivityExerciseBinding;
 import com.alignify.data.UserRepository;
+import com.alignify.engine.CaloriesEngine;
 import com.alignify.exercises.*;
 
 import java.util.Locale;
@@ -302,6 +303,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         // Save workout session
         if (sessionStartTime > 0) {
             saveWorkoutSession();
+            sessionStartTime = 0; // Prevent double-save in onDestroy
         }
 
         binding.btnToggle.setText(isVideoMode ? "Process Video" : "Start");
@@ -441,8 +443,10 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
 
                         // Always display the frame for smooth 30 FPS playback
                         mainHandler.post(() -> {
-                            if (!isDetecting.get())
+                            if (!isDetecting.get()) {
+                                finalBitmap.recycle();
                                 return;
+                            }
                             binding.videoFrameView.setImageBitmap(finalBitmap);
                         });
 
@@ -541,7 +545,16 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     private void setupCamera() {
+        // Shut down previous executor to prevent leak on camera flip
+        if (cameraExecutor != null && !cameraExecutor.isShutdown()) {
+            cameraExecutor.shutdown();
+        }
         cameraExecutor = Executors.newSingleThreadExecutor();
+
+        // Close old helper to prevent resource leak when re-creating (e.g., camera flip)
+        if (poseLandmarkerHelper != null) {
+            poseLandmarkerHelper.clearPoseLandmarker();
+        }
 
         poseLandmarkerHelper = new PoseLandmarkerHelper(
                 this,
@@ -582,7 +595,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 .build();
 
         imageAnalyzer.setAnalyzer(cameraExecutor, imageProxy -> {
-            if (isDetecting.get() && poseLandmarkerHelper.isReady()) {
+            if (isDetecting.get() && poseLandmarkerHelper != null && poseLandmarkerHelper.isReady()) {
                 Bitmap bitmap = imageProxy.toBitmap();
 
                 // Rotate bitmap based on image rotation degrees
@@ -593,6 +606,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                     matrix.postRotate(rotationDegrees);
                     rotatedBitmap = Bitmap.createBitmap(
                             bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                    bitmap.recycle(); // Recycle original after creating rotated copy
                 } else {
                     rotatedBitmap = bitmap;
                 }
@@ -648,9 +662,9 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     private void updateUI(ExerciseDetector.DetectionResult result) {
-        // Update rep counter
+        // Update rep counter - plank shows hold time in seconds, others show rep count
         if (exerciseType.equals("plank")) {
-            binding.repCounterText.setText(String.valueOf(result.getRepCount()));
+            binding.repCounterText.setText(result.getRepCount() + "s");
         } else {
             binding.repCounterText.setText(String.valueOf(result.getRepCount()));
         }
@@ -729,8 +743,9 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             return;
         }
 
-        // Estimate calories burned (rough estimate based on exercise intensity)
-        int caloriesEstimate = (int) (durationSeconds * 0.15); // ~9 cal/min
+        // Calculate calories using proper MET-based engine
+        int caloriesEstimate = CaloriesEngine.getInstance(this)
+                .getCaloriesFromExercise(exerciseType, durationSeconds);
 
         // Save to workout history
         UserRepository.getInstance().saveWorkoutSession(

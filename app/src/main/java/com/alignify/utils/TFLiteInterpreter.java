@@ -65,18 +65,20 @@ public class TFLiteInterpreter {
     }
 
     private MappedByteBuffer loadModelFromAsset(Context context, String modelPath) throws IOException {
-        AssetFileDescriptor fileDescriptor = context.getAssets().openFd(modelPath);
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        try (AssetFileDescriptor fileDescriptor = context.getAssets().openFd(modelPath);
+             FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+             FileChannel fileChannel = inputStream.getChannel()) {
+            long startOffset = fileDescriptor.getStartOffset();
+            long declaredLength = fileDescriptor.getDeclaredLength();
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        }
     }
 
     private MappedByteBuffer loadModelFromFile(File modelFile) throws IOException {
-        FileInputStream inputStream = new FileInputStream(modelFile);
-        FileChannel fileChannel = inputStream.getChannel();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+        try (FileInputStream inputStream = new FileInputStream(modelFile);
+             FileChannel fileChannel = inputStream.getChannel()) {
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+        }
     }
 
     /**
@@ -86,6 +88,13 @@ public class TFLiteInterpreter {
      * @return Float array of output probabilities
      */
     public float[] predict(float[] input) {
+        // Validate input size matches model expectation
+        int expectedSize = inputShape.length > 1 ? inputShape[1] : inputShape[0];
+        if (input.length != expectedSize) {
+            throw new IllegalArgumentException(
+                    "Input size " + input.length + " doesn't match model expected size " + expectedSize);
+        }
+
         // Clear and populate input buffer
         inputBuffer.clear();
         for (float value : input) {

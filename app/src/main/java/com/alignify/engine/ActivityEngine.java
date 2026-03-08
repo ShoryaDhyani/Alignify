@@ -36,6 +36,7 @@ public class ActivityEngine {
     private long sessionStartTime = 0;
     private long lastStepTime = 0;
     private int sessionSteps = 0;
+    private int lastTotalSteps = -1;
     private int currentCadence = 0;
     private String currentActivityType = "idle";
 
@@ -97,13 +98,21 @@ public class ActivityEngine {
         ActivityType activity = ActivityType.fromCadence(stepsThisMinute);
         currentActivityType = activity.name;
 
+        // Calculate actual step delta instead of incrementing by 1
+        int stepDelta = 0;
+        if (lastTotalSteps >= 0) {
+            stepDelta = totalSteps - lastTotalSteps;
+            if (stepDelta < 0) stepDelta = 0; // Handle reboot
+        }
+        lastTotalSteps = totalSteps;
+
         // Session management
         if (activity.level >= ActivityType.WALKING.level) {
             if (!isSessionActive) {
                 startSession(now);
             }
             lastStepTime = now;
-            sessionSteps++;
+            sessionSteps += stepDelta;
         } else if (isSessionActive && (now - lastStepTime) > SESSION_TIMEOUT_MS) {
             endSession();
         }
@@ -191,7 +200,13 @@ public class ActivityEngine {
      */
     public void logManualActivity(String type, long startTime, long endTime, float distanceKm) {
         int durationSeconds = (int) ((endTime - startTime) / 1000);
-        int calories = caloriesEngine.getCaloriesFromWalking(durationSeconds / 60, 90); // Assume moderate pace
+        int durationMinutes = Math.max(1, (int) Math.round(durationSeconds / 60.0));
+        int calories;
+        if ("running".equalsIgnoreCase(type)) {
+            calories = caloriesEngine.getCaloriesFromRunning(durationMinutes, 150);
+        } else {
+            calories = caloriesEngine.getCaloriesFromWalking(durationMinutes, 90);
+        }
 
         UserRepository.getInstance().saveActivity(
                 type,

@@ -97,6 +97,21 @@ public class SquatDetector extends ExerciseDetector {
             }
         }
 
+        // Use ML model if available for additional error detection
+        if (tfliteInterpreter != null) {
+            float[] features = LandmarkUtils.extractSquatFeatures(result);
+            if (features != null) {
+                int prediction = tfliteInterpreter.predictClass(features);
+                if (prediction == 1) {
+                    errors.add("Knees caving inward");
+                    isCorrect = false;
+                } else if (prediction == 2) {
+                    errors.add("Leaning too far forward");
+                    isCorrect = false;
+                }
+            }
+        }
+
         String feedback;
         if (!errors.isEmpty()) {
             feedback = String.join("\n", errors);

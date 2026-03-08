@@ -86,6 +86,8 @@ public class DashboardActivity extends AppCompatActivity {
     private ImageButton btnResetSteps;
     private android.widget.ProgressBar stepProgressBar;
     private BroadcastReceiver stepUpdateReceiver;
+    private TextView tvCalories;
+    private TextView tvDistance;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -388,6 +390,18 @@ public class DashboardActivity extends AppCompatActivity {
     private void setupListeners() {
         btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
 
+        // Start Running quick action
+        View btnStartRunning = findViewById(R.id.btnStartRunning);
+        if (btnStartRunning != null) {
+            btnStartRunning.setOnClickListener(v -> startActivity(new Intent(this, RunActivity.class)));
+        }
+
+        // AI Coach quick action
+        View btnTalkCoach = findViewById(R.id.btnTalkCoach);
+        if (btnTalkCoach != null) {
+            btnTalkCoach.setOnClickListener(v -> startActivity(new Intent(this, ChatbotActivity.class)));
+        }
+
         // Chatbot FAB
         FloatingActionButton fabChatbot = findViewById(R.id.fabChatbot);
         if (fabChatbot != null) {
@@ -479,6 +493,20 @@ public class DashboardActivity extends AppCompatActivity {
         stepGoalText = findViewById(R.id.stepGoalText);
         btnResetSteps = findViewById(R.id.btnResetSteps);
         stepProgressBar = findViewById(R.id.stepProgressBar);
+        tvCalories = findViewById(R.id.tvCalories);
+        tvDistance = findViewById(R.id.tvDistance);
+
+        // Observe LiveData for reactive updates to calories and distance
+        fitnessDataManager.getCaloriesLiveData().observe(this, calories -> {
+            if (tvCalories != null) {
+                tvCalories.setText(String.valueOf(calories));
+            }
+        });
+        fitnessDataManager.getDistanceLiveData().observe(this, distance -> {
+            if (tvDistance != null) {
+                tvDistance.setText(String.format(java.util.Locale.US, "%.1f km", distance));
+            }
+        });
 
         // Check if step counter is available
         if (!StepCounterHelper.isStepCounterAvailable(this)) {

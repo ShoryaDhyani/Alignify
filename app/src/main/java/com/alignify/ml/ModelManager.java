@@ -171,24 +171,34 @@ public class ModelManager {
      */
     private void downloadAllUpdates(List<ModelInfo> updates, UpdateCheckCallback callback) {
         final int[] completed = { 0 };
+        final int[] failed = { 0 };
         final int total = updates.size();
 
         for (ModelInfo info : updates) {
             downloadModel(info.name, info.storagePath, info.remoteVersion, new ModelCallback() {
                 @Override
                 public void onModelReady(File modelFile) {
-                    completed[0]++;
-                    if (completed[0] == total) {
-                        callback.onNoUpdates(); // All updated
+                    synchronized (completed) {
+                        completed[0]++;
+                        if (completed[0] == total) {
+                            if (failed[0] == 0) {
+                                callback.onNoUpdates();
+                            } else {
+                                callback.onError(failed[0] + " of " + total + " models failed to download");
+                            }
+                        }
                     }
                 }
 
                 @Override
                 public void onError(String error) {
                     Log.e(TAG, "Error downloading " + info.name + ": " + error);
-                    completed[0]++;
-                    if (completed[0] == total) {
-                        callback.onError("Some models failed to download");
+                    synchronized (completed) {
+                        completed[0]++;
+                        failed[0]++;
+                        if (completed[0] == total) {
+                            callback.onError(failed[0] + " of " + total + " models failed to download");
+                        }
                     }
                 }
             });
@@ -232,10 +242,11 @@ public class ModelManager {
         File cachedModel = getModelFileSync(modelName);
 
         if (cachedModel != null) {
-            // Load from cached file
-            FileInputStream fis = new FileInputStream(cachedModel);
-            FileChannel channel = fis.getChannel();
-            return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            // Use try-with-resources to prevent file descriptor leaks
+            try (FileInputStream fis = new FileInputStream(cachedModel);
+                 FileChannel channel = fis.getChannel()) {
+                return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            }
         }
 
         // Load from assets (fallback)
@@ -248,17 +259,24 @@ public class ModelManager {
     private void downloadModel(String modelName, String storagePath, int version,
             ModelCallback callback) {
         StorageReference modelRef = storage.getReference().child(storagePath);
-        File localFile = new File(modelsDir, modelName + ".tflite");
+        File tempFile = new File(modelsDir, modelName + ".tflite.tmp");
+        File finalFile = new File(modelsDir, modelName + ".tflite");
 
-        modelRef.getFile(localFile)
+        modelRef.getFile(tempFile)
                 .addOnSuccessListener(taskSnapshot -> {
-                    // Save version
-                    prefs.edit().putInt(modelName, version).apply();
-                    availableUpdates.remove(modelName);
-                    Log.d(TAG, "Downloaded " + modelName + " v" + version);
-                    callback.onModelReady(localFile);
+                    // Atomic rename to prevent corrupt files from interrupted downloads
+                    if (tempFile.renameTo(finalFile)) {
+                        prefs.edit().putInt(modelName, version).apply();
+                        availableUpdates.remove(modelName);
+                        Log.d(TAG, "Downloaded " + modelName + " v" + version);
+                        callback.onModelReady(finalFile);
+                    } else {
+                        tempFile.delete();
+                        callback.onError("Failed to finalize model file");
+                    }
                 })
                 .addOnFailureListener(e -> {
+                    tempFile.delete(); // Clean up partial download
                     Log.e(TAG, "Failed to download " + modelName, e);
                     callback.onError(e.getMessage());
                 });

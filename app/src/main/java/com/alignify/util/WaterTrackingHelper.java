@@ -113,7 +113,7 @@ public class WaterTrackingHelper {
         // Find next reminder hour
         int nextHour = -1;
         for (int hour : reminderHours) {
-            if (hour > currentHour || (hour == currentHour && now.get(Calendar.MINUTE) < 0)) {
+            if (hour > currentHour) {
                 nextHour = hour;
                 break;
             }

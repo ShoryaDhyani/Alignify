@@ -91,7 +91,11 @@ public class LungeDetector extends ExerciseDetector {
             if (features != null) {
                 int prediction = tfliteInterpreter.predictClass(features);
                 if (prediction == 1) {
-                    // Additional error detection from model
+                    errors.add("Torso leaning - keep upright");
+                    isCorrect = false;
+                } else if (prediction == 2) {
+                    errors.add("Back knee too high - lower it");
+                    isCorrect = false;
                 }
             }
         }
@@ -116,15 +120,18 @@ public class LungeDetector extends ExerciseDetector {
     private String checkKneeOverToe(PoseLandmarkerResult result, boolean isLeft) {
         int kneeIdx = isLeft ? LandmarkUtils.Landmarks.LEFT_KNEE : LandmarkUtils.Landmarks.RIGHT_KNEE;
         int ankleIdx = isLeft ? LandmarkUtils.Landmarks.LEFT_ANKLE : LandmarkUtils.Landmarks.RIGHT_ANKLE;
+        int hipIdx = isLeft ? LandmarkUtils.Landmarks.LEFT_HIP : LandmarkUtils.Landmarks.RIGHT_HIP;
 
         LandmarkUtils.Point2D knee = LandmarkUtils.getPoint2D(result, kneeIdx);
         LandmarkUtils.Point2D ankle = LandmarkUtils.getPoint2D(result, ankleIdx);
+        LandmarkUtils.Point2D hip = LandmarkUtils.getPoint2D(result, hipIdx);
 
-        if (knee != null && ankle != null) {
-            // Check if knee extends past ankle horizontally
-            float diff = knee.x - ankle.x;
-            if (Math.abs(diff) > KNEE_TOE_THRESHOLD &&
-                    ((isLeft && diff < 0) || (!isLeft && diff > 0))) {
+        if (knee != null && ankle != null && hip != null) {
+            // Determine forward direction from hip-to-ankle vector
+            float forwardDir = ankle.x - hip.x;
+            // Knee extension past ankle in the forward direction
+            float kneeExtension = (knee.x - ankle.x) * Math.signum(forwardDir);
+            if (kneeExtension > KNEE_TOE_THRESHOLD) {
                 return "Keep knee behind toes";
             }
         }
@@ -137,5 +144,6 @@ public class LungeDetector extends ExerciseDetector {
         super.reset();
         previousStage = "up";
         currentStage = "up";
+        leadLeg = "left";
     }
 }
