@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.alignify"
-    >
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Camera permissions -->
     <uses-feature android:name="android.hardware.camera" android:required="true" />
@@ -61,7 +59,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_MAPS_API_KEY_HERE" />
+            android:value="${MAPS_API_KEY}" />
 
         <!-- Preloaded Google Fonts for offline use -->
         <meta-data
