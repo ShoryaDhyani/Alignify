@@ -550,7 +550,7 @@ public class RunActivity extends AppCompatActivity implements OnMapReadyCallback
     private void updateStatsDisplay(float distanceKm, int steps, int calories,
             float avgSpeedKmh, String paceStr) {
         tvRunDistance.setText(String.format("%.2f km", distanceKm));
-        tvRunSteps.setText(String.valueOf(steps));
+        tvRunSteps.setText(steps + " steps");
         tvRunCalories.setText(calories + " cal");
         tvRunAvgSpeed.setText(String.format("%.1f km/h", avgSpeedKmh));
         tvRunPace.setText(paceStr);
