@@ -227,7 +227,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         Toast.makeText(this, "You can complete your profile later in Settings", Toast.LENGTH_SHORT).show();
 
         // Navigate to dashboard
-        Intent intent = new Intent(this, DashboardActivity.class);
+        Intent intent = new Intent(this, HomeActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
@@ -621,7 +621,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         if (isEditMode) {
             finish();
         } else {
-            Intent intent = new Intent(this, DashboardActivity.class);
+            Intent intent = new Intent(this, HomeActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
             finish();

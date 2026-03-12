@@ -1,6 +1,7 @@
 package com.alignify.exercises;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.utils.LandmarkUtils;
@@ -99,16 +100,20 @@ public class SquatDetector extends ExerciseDetector {
 
         // Use ML model if available for additional error detection
         if (tfliteInterpreter != null) {
-            float[] features = LandmarkUtils.extractSquatFeatures(result);
-            if (features != null) {
-                int prediction = tfliteInterpreter.predictClass(features);
-                if (prediction == 1) {
-                    errors.add("Knees caving inward");
-                    isCorrect = false;
-                } else if (prediction == 2) {
-                    errors.add("Leaning too far forward");
-                    isCorrect = false;
+            try {
+                float[] features = LandmarkUtils.extractSquatFeatures(result);
+                if (features != null) {
+                    int prediction = tfliteInterpreter.predictClass(features);
+                    if (prediction == 1) {
+                        errors.add("Knees caving inward");
+                        isCorrect = false;
+                    } else if (prediction == 2) {
+                        errors.add("Leaning too far forward");
+                        isCorrect = false;
+                    }
                 }
+            } catch (Exception e) {
+                Log.w("SquatDetector", "ML inference failed", e);
             }
         }
 

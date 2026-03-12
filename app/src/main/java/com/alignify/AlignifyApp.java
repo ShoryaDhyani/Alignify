@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.mapbox.common.MapboxOptions;
+
 public class AlignifyApp extends Application {
 
     public static final String PREFS_NAME = "AlignifyPrefs";
@@ -14,6 +16,14 @@ public class AlignifyApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Initialize Mapbox access token
+        String mapboxToken = getString(R.string.mapbox_access_token);
+        if (mapboxToken != null && !mapboxToken.isEmpty()
+                && !mapboxToken.equals("YOUR_MAPBOX_ACCESS_TOKEN")) {
+            MapboxOptions.setAccessToken(mapboxToken);
+        }
+
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Support new theme_mode key ("light", "dark", "system")

@@ -1,7 +1,9 @@
 package com.alignify;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.media.MediaMetadataRetriever;
@@ -11,6 +13,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
+import android.view.Surface;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -122,7 +125,9 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         setupUI();
 
         if (!isVideoMode) {
-            setupCamera();
+            // Defer camera setup until the view is attached to a window
+            // to avoid getDisplay() returning null
+            binding.cameraPreview.post(this::setupCamera);
         }
     }
 
@@ -320,6 +325,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         binding.exerciseStatusText.setText("Ready to start");
         binding.timerText.setText("00:00");
         binding.repCounterText.setText("0");
+        binding.repCounterLabel.setText(exerciseType.equals("plank") ? "HOLD" : "REPS");
         binding.feedbackText.setText("Press Start to begin");
         binding.feedbackText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary_dark));
         binding.feedbackIcon.setImageResource(R.drawable.ic_info);
@@ -545,13 +551,22 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     private void setupCamera() {
+        // Check camera permission as a safety net
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Camera permission not granted");
+            Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         // Shut down previous executor to prevent leak on camera flip
         if (cameraExecutor != null && !cameraExecutor.isShutdown()) {
             cameraExecutor.shutdown();
         }
         cameraExecutor = Executors.newSingleThreadExecutor();
 
-        // Close old helper to prevent resource leak when re-creating (e.g., camera flip)
+        // Close old helper to prevent resource leak when re-creating (e.g., camera
+        // flip)
         if (poseLandmarkerHelper != null) {
             poseLandmarkerHelper.clearPoseLandmarker();
         }
@@ -577,21 +592,34 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         }, ContextCompat.getMainExecutor(this));
     }
 
+    private int getDisplayRotation() {
+        android.view.Display display = binding.cameraPreview.getDisplay();
+        if (display != null) {
+            return display.getRotation();
+        }
+        return Surface.ROTATION_0;
+    }
+
     private void bindCameraUseCases(ProcessCameraProvider cameraProvider) {
+        if (isFinishing() || isDestroyed())
+            return;
+
         int lensFacing = isFrontCamera ? CameraSelector.LENS_FACING_FRONT : CameraSelector.LENS_FACING_BACK;
         CameraSelector cameraSelector = new CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
                 .build();
 
+        int rotation = getDisplayRotation();
+
         Preview preview = new Preview.Builder()
-                .setTargetRotation(binding.cameraPreview.getDisplay().getRotation())
+                .setTargetRotation(rotation)
                 .build();
         preview.setSurfaceProvider(binding.cameraPreview.getSurfaceProvider());
 
         ImageAnalysis imageAnalyzer = new ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .setTargetRotation(binding.cameraPreview.getDisplay().getRotation())
+                .setTargetRotation(rotation)
                 .build();
 
         imageAnalyzer.setAnalyzer(cameraExecutor, imageProxy -> {
@@ -634,10 +662,13 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
 
     @Override
     public void onResults(PoseLandmarkerResult result, MPImage input) {
-        if (!isDetecting.get())
+        if (!isDetecting.get() || result == null || result.landmarks().isEmpty())
             return;
 
         runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed())
+                return;
+
             // Update overlay
             binding.overlayView.setResults(
                     result,
@@ -664,8 +695,10 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private void updateUI(ExerciseDetector.DetectionResult result) {
         // Update rep counter - plank shows hold time in seconds, others show rep count
         if (exerciseType.equals("plank")) {
+            binding.repCounterLabel.setText("HOLD");
             binding.repCounterText.setText(result.getRepCount() + "s");
         } else {
+            binding.repCounterLabel.setText("REPS");
             binding.repCounterText.setText(String.valueOf(result.getRepCount()));
         }
 

@@ -8,49 +8,48 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.GestureDetector;
-import android.view.MotionEvent;
-import android.widget.Button;
+import android.view.LayoutInflater;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import android.view.MenuItem;
-import android.view.View;
-
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.google.android.material.navigation.NavigationView;
-import android.widget.ImageButton;
-
-import com.alignify.ml.ModelManager;
-import com.alignify.service.StepCounterService;
-import com.alignify.util.NavigationHelper;
-import com.alignify.util.StepCounterHelper;
+import com.alignify.chatbot.ChatbotActivity;
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
-import com.alignify.chatbot.ChatbotActivity;
+import com.alignify.ml.ModelManager;
+import com.alignify.service.StepCounterService;
+import com.alignify.util.NavigationHelper;
 import com.alignify.util.ProfileImageHelper;
+import com.alignify.util.StepCounterHelper;
 import com.bumptech.glide.Glide;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 /**
- * Dashboard/Home screen showing user profile and system status.
+ * Dashboard/Home fragment showing user profile and system status.
+ * Converted from DashboardActivity for ViewPager2-based navigation.
  */
-public class DashboardActivity extends AppCompatActivity {
+public class DashboardFragment extends Fragment {
 
     private static final String PREFS_NAME = "AlignifyPrefs";
     private static final String KEY_LOGGED_IN = "logged_in";
@@ -65,219 +64,161 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView bmiValue;
     private TextView fitnessLevel;
     private ImageView ivProfileImage;
-
     private View btnStartCorrection;
 
     // Navigation drawer
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
 
-    // Bottom navigation
-    private View navHome;
-    private View navExercises;
-    private View navAnalytics;
-    private View navProfile;
-
     private FirebaseAuth firebaseAuth;
     private GoogleSignInClient googleSignInClient;
 
     // Step counter
-    private static final String TAG = "DashboardActivity";
+    private static final String TAG = "DashboardFragment";
     private FitnessDataManager fitnessDataManager;
     private TextView stepsValue;
     private TextView stepGoalText;
     private ImageButton btnResetSteps;
-    private android.widget.ProgressBar stepProgressBar;
+    private ProgressBar stepProgressBar;
     private BroadcastReceiver stepUpdateReceiver;
     private TextView tvCalories;
     private TextView tvDistance;
 
-    // Swipe navigation
-    private GestureDetector swipeDetector;
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_dashboard_new, container, false);
+    }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_dashboard_new);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Hide the bottom nav bar from the inflated layout (HomeActivity provides the
+        // nav)
+        View bottomNav = view.findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.GONE);
+        }
 
         // Initialize Firebase Auth
         firebaseAuth = FirebaseAuth.getInstance();
 
-        // Initialize FitnessDataManager (single source of truth for fitness data)
-        fitnessDataManager = FitnessDataManager.getInstance(this);
+        // Initialize FitnessDataManager
+        fitnessDataManager = FitnessDataManager.getInstance(requireContext());
 
-        // Initialize Google Sign-In client for logout
+        // Initialize Google Sign-In client
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .build();
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
+        googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
-        initViews();
+        initViews(view);
         loadUserProfile();
-        setupListeners();
+        setupListeners(view);
+        setupStepCounter(view);
 
-        // Setup step counter
-        setupStepCounter();
-
-        // Load data from Firestore and sync with local
+        // Load data from Firestore
         fitnessDataManager.loadFromFirestore(null);
 
         // Check for model updates
         checkForModelUpdates();
-
-        // Setup swipe navigation
-        swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_HOME);
-
-        // Setup overscroll navigation on main ScrollView
-        View contentView = findViewById(android.R.id.content);
-        if (contentView instanceof android.view.ViewGroup) {
-            ScrollView mainScroll = findScrollView((android.view.ViewGroup) contentView);
-            if (mainScroll != null) {
-                NavigationHelper.enableOverscrollNavigation(this, mainScroll, NavigationHelper.NAV_HOME);
-            }
-        }
-    }
-
-    private ScrollView findScrollView(android.view.ViewGroup parent) {
-        for (int i = 0; i < parent.getChildCount(); i++) {
-            View child = parent.getChildAt(i);
-            if (child instanceof ScrollView)
-                return (ScrollView) child;
-            if (child instanceof android.view.ViewGroup) {
-                ScrollView found = findScrollView((android.view.ViewGroup) child);
-                if (found != null)
-                    return found;
-            }
-        }
-        return null;
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (swipeDetector != null) {
-            swipeDetector.onTouchEvent(ev);
-        }
-        return super.dispatchTouchEvent(ev);
-    }
-
-    @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
-        // Reload profile when returning from profile edit
+        if (!isAdded())
+            return;
         loadUserProfile();
-
-        // Update step count
         updateStepCountDisplay();
-
-        // Register step update receiver
         registerStepUpdateReceiver();
-
-        // Load today's activity from Firestore
         loadTodayActivityFromFirestore();
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
-        // Unregister step update receiver
         if (stepUpdateReceiver != null) {
-            LocalBroadcastManager.getInstance(this).unregisterReceiver(stepUpdateReceiver);
+            LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(stepUpdateReceiver);
         }
-        // Sync current steps to FitnessDataManager (which handles Firestore sync)
         syncStepsToManager();
     }
 
-    /**
-     * Loads today's activity data from FitnessDataManager.
-     */
     private void loadTodayActivityFromFirestore() {
-        // Use FitnessDataManager which handles local cache + Firestore sync
         int steps = fitnessDataManager.getStepsToday();
         updateStepUI(steps);
 
-        // Also load from Firestore to merge any remote data
         fitnessDataManager.loadFromFirestore(() -> {
-            runOnUiThread(() -> {
-                int mergedSteps = fitnessDataManager.getStepsToday();
-                updateStepUI(mergedSteps);
-                Log.d(TAG, "Loaded from FitnessDataManager: steps=" + mergedSteps +
-                        ", calories=" + fitnessDataManager.getCaloriesToday() +
-                        ", activeMinutes=" + fitnessDataManager.getActiveMinutesToday());
-            });
+            if (isAdded()) {
+                requireActivity().runOnUiThread(() -> {
+                    int mergedSteps = fitnessDataManager.getStepsToday();
+                    updateStepUI(mergedSteps);
+                    Log.d(TAG, "Loaded from FitnessDataManager: steps=" + mergedSteps);
+                });
+            }
         });
     }
 
-    /**
-     * Syncs current step count to FitnessDataManager.
-     */
     private void syncStepsToManager() {
-        if (!StepCounterHelper.isStepTrackingEnabled(this))
+        if (!isAdded())
+            return;
+        if (!StepCounterHelper.isStepTrackingEnabled(requireContext()))
             return;
 
-        int steps = StepCounterHelper.getStepsToday(this);
+        int steps = StepCounterHelper.getStepsToday(requireContext());
         if (steps > 0) {
-            // FitnessDataManager auto-calculates calories and distance
             fitnessDataManager.setStepsToday(steps);
-            Log.d(TAG, "Synced steps to FitnessDataManager: " + steps);
         }
     }
 
-    private void initViews() {
-        userName = findViewById(R.id.userName);
-        bmiValue = findViewById(R.id.bmiValue);
-        fitnessLevel = findViewById(R.id.fitnessLevel);
-        ivProfileImage = findViewById(R.id.ivProfileImage);
-
-        btnStartCorrection = findViewById(R.id.btnStartCorrection);
-
-        // Bottom navigation
-        navHome = findViewById(R.id.navHome);
-        navExercises = findViewById(R.id.navExercises);
-        navAnalytics = findViewById(R.id.navAnalytics);
-        navProfile = findViewById(R.id.navProfile);
+    private void initViews(View view) {
+        userName = view.findViewById(R.id.userName);
+        bmiValue = view.findViewById(R.id.bmiValue);
+        fitnessLevel = view.findViewById(R.id.fitnessLevel);
+        ivProfileImage = view.findViewById(R.id.ivProfileImage);
+        btnStartCorrection = view.findViewById(R.id.btnStartCorrection);
 
         // Navigation drawer
-        drawerLayout = findViewById(R.id.drawerLayout);
-        navigationView = findViewById(R.id.navigationView);
+        drawerLayout = view.findViewById(R.id.drawerLayout);
+        navigationView = view.findViewById(R.id.navigationView);
 
         // Setup hamburger menu
-        ImageView btnMenu = findViewById(R.id.btnMenu);
-        btnMenu.setOnClickListener(v -> drawerLayout.openDrawer(navigationView));
+        ImageView btnMenu = view.findViewById(R.id.btnMenu);
+        if (btnMenu != null) {
+            btnMenu.setOnClickListener(v -> {
+                if (drawerLayout != null) {
+                    drawerLayout.openDrawer(navigationView);
+                }
+            });
+        }
 
         // Setup navigation item selection
-        navigationView.setNavigationItemSelectedListener(this::onNavigationItemSelected);
-
-        // Populate nav header with user data
-        populateNavHeader();
-
-        // Setup bottom navigation with highlighting
-        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_HOME,
-                navHome, navExercises, navAnalytics, navProfile);
+        if (navigationView != null) {
+            navigationView.setNavigationItemSelectedListener(this::onNavigationItemSelected);
+            populateNavHeader();
+        }
     }
 
-    /**
-     * Populates the navigation drawer header with user profile data from
-     * Google/Firebase
-     */
     private void populateNavHeader() {
+        if (navigationView == null)
+            return;
         View headerView = navigationView.getHeaderView(0);
+        if (headerView == null)
+            return;
+
         ImageView navAvatar = headerView.findViewById(R.id.navAvatar);
         TextView navUserName = headerView.findViewById(R.id.navUserName);
         TextView navUserEmail = headerView.findViewById(R.id.navUserEmail);
 
-        // Get current Firebase user
         FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
-
-        // Get Google Sign-In account for photo URL
-        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
-
-        // Get user info from SharedPreferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(requireContext());
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String storedName = prefs.getString(KEY_USER_NAME, "");
         String storedEmail = prefs.getString(KEY_USER_EMAIL, "");
         String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
 
-        // Set user name - prioritize Firebase, then Google, then stored prefs
         String displayName = "";
         if (firebaseUser != null && firebaseUser.getDisplayName() != null && !firebaseUser.getDisplayName().isEmpty()) {
             displayName = firebaseUser.getDisplayName();
@@ -288,7 +229,6 @@ public class DashboardActivity extends AppCompatActivity {
         }
         navUserName.setText(displayName.isEmpty() ? "User" : displayName);
 
-        // Set email - prioritize Firebase, then stored
         String email = "";
         if (firebaseUser != null && firebaseUser.getEmail() != null) {
             email = firebaseUser.getEmail();
@@ -297,11 +237,8 @@ public class DashboardActivity extends AppCompatActivity {
         }
         navUserEmail.setText(email);
 
-        // Load profile photo - prioritize local storage, then cached URL, then
-        // Google/Firebase
-        // account photos
-        if (ProfileImageHelper.hasProfileImage(this)) {
-            String localPath = ProfileImageHelper.getProfileImagePath(this);
+        if (ProfileImageHelper.hasProfileImage(requireContext())) {
+            String localPath = ProfileImageHelper.getProfileImagePath(requireContext());
             Glide.with(this)
                     .load(new java.io.File(localPath))
                     .placeholder(R.drawable.ic_profile)
@@ -322,7 +259,6 @@ public class DashboardActivity extends AppCompatActivity {
             } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
                 photoUrl = firebaseUser.getPhotoUrl();
             }
-
             if (photoUrl != null) {
                 Glide.with(this)
                         .load(photoUrl)
@@ -337,16 +273,16 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void loadUserProfile() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (!isAdded())
+            return;
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        // Load user data
         String email = prefs.getString(KEY_USER_EMAIL, "User");
         String googleName = prefs.getString(KEY_USER_NAME, "");
         float bmi = prefs.getFloat(KEY_USER_BMI, 0f);
         String bmiCategory = prefs.getString(KEY_USER_BMI_CATEGORY, "Normal");
         String activity = prefs.getString(KEY_USER_ACTIVITY, "Active");
 
-        // Use Google display name if available, otherwise extract from email
         String name;
         if (!googleName.isEmpty()) {
             name = googleName;
@@ -358,26 +294,27 @@ public class DashboardActivity extends AppCompatActivity {
         } else {
             name = email;
         }
-        userName.setText(name);
+        if (userName != null)
+            userName.setText(name);
 
-        // Set BMI
         if (bmi > 0) {
-            bmiValue.setText(String.format("%.1f", bmi));
+            if (bmiValue != null)
+                bmiValue.setText(String.format("%.1f", bmi));
         } else {
-            bmiValue.setText("--");
+            if (bmiValue != null)
+                bmiValue.setText("--");
         }
 
-        // Set fitness level
-        fitnessLevel.setText("Fitness Level: " + activity);
-
-        // Load profile image
+        if (fitnessLevel != null)
+            fitnessLevel.setText("Fitness Level: " + activity);
         loadProfileImage();
     }
 
     private void loadProfileImage() {
-        // First, try to load from local storage (ProfileImageHelper)
-        if (ProfileImageHelper.hasProfileImage(this) && ivProfileImage != null) {
-            String localPath = ProfileImageHelper.getProfileImagePath(this);
+        if (!isAdded())
+            return;
+        if (ProfileImageHelper.hasProfileImage(requireContext()) && ivProfileImage != null) {
+            String localPath = ProfileImageHelper.getProfileImagePath(requireContext());
             Glide.with(this)
                     .load(new java.io.File(localPath))
                     .placeholder(R.drawable.ic_profile)
@@ -387,8 +324,7 @@ public class DashboardActivity extends AppCompatActivity {
             return;
         }
 
-        // Fallback to SharedPreferences cached URL (for backwards compatibility)
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String cachedImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
 
         if (cachedImageUrl != null && !cachedImageUrl.isEmpty() && ivProfileImage != null) {
@@ -399,13 +335,14 @@ public class DashboardActivity extends AppCompatActivity {
                     .circleCrop()
                     .into(ivProfileImage);
         } else {
-            // No custom profile image, try Google/Firebase account photos
             loadDefaultAccountPhoto();
         }
     }
 
     private void loadDefaultAccountPhoto() {
-        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+        if (!isAdded())
+            return;
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(requireContext());
         FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
 
         android.net.Uri photoUrl = null;
@@ -427,51 +364,50 @@ public class DashboardActivity extends AppCompatActivity {
         }
     }
 
-    private void setupListeners() {
-        btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
+    private void setupListeners(View view) {
+        if (btnStartCorrection != null) {
+            btnStartCorrection.setOnClickListener(v -> navigateToTab(NavigationHelper.NAV_EXERCISES));
+        }
 
-        // Start Running quick action
-        View btnStartRunning = findViewById(R.id.btnStartRunning);
+        View btnStartRunning = view.findViewById(R.id.btnStartRunning);
         if (btnStartRunning != null) {
-            btnStartRunning.setOnClickListener(v -> startActivity(new Intent(this, RunActivity.class)));
+            btnStartRunning.setOnClickListener(v -> navigateToTab(NavigationHelper.NAV_RUN));
         }
 
-        // AI Coach quick action
-        View btnTalkCoach = findViewById(R.id.btnTalkCoach);
+        View btnTalkCoach = view.findViewById(R.id.btnTalkCoach);
         if (btnTalkCoach != null) {
-            btnTalkCoach.setOnClickListener(v -> startActivity(new Intent(this, ChatbotActivity.class)));
+            btnTalkCoach.setOnClickListener(v -> startActivity(new Intent(requireContext(), ChatbotActivity.class)));
         }
 
-        // Chatbot FAB
-        FloatingActionButton fabChatbot = findViewById(R.id.fabChatbot);
+        FloatingActionButton fabChatbot = view.findViewById(R.id.fabChatbot);
         if (fabChatbot != null) {
-            fabChatbot.setOnClickListener(v -> {
-                startActivity(new Intent(this, ChatbotActivity.class));
-            });
+            fabChatbot.setOnClickListener(v -> startActivity(new Intent(requireContext(), ChatbotActivity.class)));
         }
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {
-        drawerLayout.closeDrawers();
+        if (drawerLayout != null)
+            drawerLayout.closeDrawers();
         int id = item.getItemId();
 
         if (id == R.id.nav_dashboard) {
-            // Already on dashboard
             return true;
         } else if (id == R.id.nav_steps) {
-            startActivity(new Intent(this, StepActivity.class));
+            startActivity(new Intent(requireContext(), StepActivity.class));
             return true;
         } else if (id == R.id.nav_exercises) {
-            navigateToExerciseSelection();
+            navigateToTab(NavigationHelper.NAV_EXERCISES);
             return true;
         } else if (id == R.id.nav_history) {
-            startActivity(new Intent(this, ActivityActivity.class));
+            navigateToTab(NavigationHelper.NAV_ANALYTICS);
             return true;
         } else if (id == R.id.nav_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
+            navigateToTab(NavigationHelper.NAV_PROFILE);
             return true;
         } else if (id == R.id.nav_profile) {
-            navigateToEditProfile();
+            Intent intent = new Intent(requireContext(), ProfileSetupActivity.class);
+            intent.putExtra("edit_mode", true);
+            startActivity(intent);
             return true;
         } else if (id == R.id.nav_logout) {
             showLogoutConfirmation();
@@ -480,14 +416,16 @@ public class DashboardActivity extends AppCompatActivity {
         return false;
     }
 
-    private void navigateToEditProfile() {
-        Intent intent = new Intent(this, ProfileSetupActivity.class);
-        intent.putExtra("edit_mode", true);
-        startActivity(intent);
+    private void navigateToTab(int tabIndex) {
+        if (getActivity() instanceof HomeActivity) {
+            ((HomeActivity) getActivity()).navigateToTab(tabIndex);
+        }
     }
 
     private void showLogoutConfirmation() {
-        new AlertDialog.Builder(this)
+        if (!isAdded())
+            return;
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Logout")
                 .setMessage("Are you sure you want to logout?")
                 .setPositiveButton("Logout", (dialog, which) -> performLogout())
@@ -496,67 +434,52 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void performLogout() {
-        // Sign out from Firebase Auth
+        if (!isAdded())
+            return;
         if (firebaseAuth != null) {
             firebaseAuth.signOut();
         }
 
-        // Sign out from Google
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            // Clear SharedPreferences
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        googleSignInClient.signOut().addOnCompleteListener(requireActivity(), task -> {
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().clear().apply();
 
-            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
 
-            // Navigate to login
-            Intent intent = new Intent(this, LoginActivity.class);
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
-            finish();
+            requireActivity().finish();
         });
     }
 
-    private void navigateToExerciseSelection() {
-        Intent intent = new Intent(this, MainActivity.class);
-        startActivity(intent);
-    }
+    // ==================== Step Counter ====================
 
-    // ==================== Step Counter Integration ====================
+    private void setupStepCounter(View view) {
+        stepsValue = view.findViewById(R.id.stepsValue);
+        stepGoalText = view.findViewById(R.id.stepGoalText);
+        btnResetSteps = view.findViewById(R.id.btnResetSteps);
+        stepProgressBar = view.findViewById(R.id.stepProgressBar);
+        tvCalories = view.findViewById(R.id.tvCalories);
+        tvDistance = view.findViewById(R.id.tvDistance);
 
-    /**
-     * Sets up the step counter feature.
-     */
-    private void setupStepCounter() {
-        // Initialize views
-        stepsValue = findViewById(R.id.stepsValue);
-        stepGoalText = findViewById(R.id.stepGoalText);
-        btnResetSteps = findViewById(R.id.btnResetSteps);
-        stepProgressBar = findViewById(R.id.stepProgressBar);
-        tvCalories = findViewById(R.id.tvCalories);
-        tvDistance = findViewById(R.id.tvDistance);
-
-        // Observe LiveData for reactive updates to calories and distance
-        fitnessDataManager.getCaloriesLiveData().observe(this, calories -> {
+        fitnessDataManager.getCaloriesLiveData().observe(getViewLifecycleOwner(), calories -> {
             if (tvCalories != null) {
                 tvCalories.setText(String.valueOf(calories));
             }
         });
-        fitnessDataManager.getDistanceLiveData().observe(this, distance -> {
+        fitnessDataManager.getDistanceLiveData().observe(getViewLifecycleOwner(), distance -> {
             if (tvDistance != null) {
                 tvDistance.setText(String.format(java.util.Locale.US, "%.1f km", distance));
             }
         });
 
-        // Check if step counter is available
-        if (!StepCounterHelper.isStepCounterAvailable(this)) {
-            Log.w(TAG, "Step counter sensor not available on this device");
-            if (stepsValue != null) {
+        if (!StepCounterHelper.isStepCounterAvailable(requireContext())) {
+            Log.w(TAG, "Step counter sensor not available");
+            if (stepsValue != null)
                 stepsValue.setText("N/A");
-            }
-            if (stepGoalText != null) {
+            if (stepGoalText != null)
                 stepGoalText.setText("Step counter not available");
-            }
             if (btnResetSteps != null) {
                 btnResetSteps.setEnabled(false);
                 btnResetSteps.setAlpha(0.3f);
@@ -564,20 +487,17 @@ public class DashboardActivity extends AppCompatActivity {
             return;
         }
 
-        // Setup reset button with confirmation
         if (btnResetSteps != null) {
             btnResetSteps.setOnClickListener(v -> showResetStepsConfirmation());
         }
 
-        // Always start step tracking if permissions are granted
         startStepTracking();
     }
 
-    /**
-     * Shows confirmation dialog before resetting steps.
-     */
     private void showResetStepsConfirmation() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        if (!isAdded())
+            return;
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Reset Today's Steps")
                 .setMessage("This will reset your step count to zero. This action cannot be undone.")
                 .setPositiveButton("Reset", (dialog, which) -> resetSteps())
@@ -585,59 +505,52 @@ public class DashboardActivity extends AppCompatActivity {
                 .show();
     }
 
-    /**
-     * Resets steps both locally and in Firestore.
-     */
     private void resetSteps() {
-        // Reset local step counter
-        StepCounterService.resetStepCounter(this);
+        if (!isAdded())
+            return;
+        StepCounterService.resetStepCounter(requireContext());
 
-        // Reset in Firestore
         UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
-                runOnUiThread(() -> {
-                    updateStepCountDisplay();
-                    Toast.makeText(DashboardActivity.this, "Steps reset successfully", Toast.LENGTH_SHORT).show();
-                });
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        updateStepCountDisplay();
+                        Toast.makeText(requireContext(), "Steps reset successfully", Toast.LENGTH_SHORT).show();
+                    });
+                }
             }
 
             @Override
             public void onError(String error) {
-                runOnUiThread(() -> {
-                    Toast.makeText(DashboardActivity.this, "Failed to sync reset: " + error, Toast.LENGTH_SHORT).show();
-                });
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Failed to sync reset: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
             }
         });
 
-        // Update UI immediately
-        if (stepsValue != null) {
+        if (stepsValue != null)
             stepsValue.setText("0");
-        }
-        if (stepProgressBar != null) {
+        if (stepProgressBar != null)
             stepProgressBar.setProgress(0);
-        }
     }
 
-    /**
-     * Starts step tracking after checking/requesting permissions.
-     */
     private void startStepTracking() {
-        // Check if we have permissions
-        if (!StepCounterHelper.hasAllPermissions(this)) {
-            // Request permissions
-            StepCounterHelper.requestPermissions(this);
+        if (!isAdded())
+            return;
+        if (!StepCounterHelper.hasAllPermissions(requireContext())) {
+            StepCounterHelper.requestPermissions(requireActivity());
         } else {
-            // Start step tracking
-            StepCounterHelper.startStepTracking(this, true);
+            StepCounterHelper.startStepTracking(requireContext(), true);
             updateStepCountDisplay();
         }
     }
 
-    /**
-     * Registers the broadcast receiver for step updates.
-     */
     private void registerStepUpdateReceiver() {
+        if (!isAdded())
+            return;
         stepUpdateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -647,35 +560,28 @@ public class DashboardActivity extends AppCompatActivity {
                 }
             }
         };
-
         IntentFilter filter = new IntentFilter(StepCounterService.ACTION_STEP_UPDATE);
-        LocalBroadcastManager.getInstance(this).registerReceiver(stepUpdateReceiver, filter);
+        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(stepUpdateReceiver, filter);
     }
 
-    /**
-     * Updates the step count display from SharedPreferences.
-     */
     private void updateStepCountDisplay() {
-        if (StepCounterHelper.isStepTrackingEnabled(this)) {
-            int steps = StepCounterHelper.getStepsToday(this);
+        if (!isAdded())
+            return;
+        if (StepCounterHelper.isStepTrackingEnabled(requireContext())) {
+            int steps = StepCounterHelper.getStepsToday(requireContext());
             updateStepUI(steps);
-
-            // Also sync to FitnessDataManager
             fitnessDataManager.setStepsToday(steps);
         }
     }
 
-    /**
-     * Updates the step counter UI elements.
-     */
     private void updateStepUI(int steps) {
+        if (!isAdded())
+            return;
         int stepGoal = fitnessDataManager.getStepGoal();
-        if (stepsValue != null) {
+        if (stepsValue != null)
             stepsValue.setText(String.valueOf(steps));
-        }
-        if (stepGoalText != null) {
+        if (stepGoalText != null)
             stepGoalText.setText(steps + " / " + stepGoal + " steps");
-        }
         if (stepProgressBar != null) {
             stepProgressBar.setMax(stepGoal);
             stepProgressBar.setProgress(Math.min(steps, stepGoal));
@@ -698,24 +604,22 @@ public class DashboardActivity extends AppCompatActivity {
 
             if (allGranted) {
                 Log.d(TAG, "All step counter permissions granted");
-                StepCounterHelper.startStepTracking(this, true);
+                StepCounterHelper.startStepTracking(requireContext(), true);
                 updateStepCountDisplay();
             } else {
                 Log.w(TAG, "Step counter permissions denied");
-                Toast.makeText(this, "Step tracking requires permissions", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Step tracking requires permissions", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
-    /**
-     * Check for AI model updates and show dialog if available.
-     */
     private void checkForModelUpdates() {
-        ModelManager.getInstance(this).checkForUpdates(this,
+        if (!isAdded())
+            return;
+        ModelManager.getInstance(requireContext()).checkForUpdates(requireActivity(),
                 new ModelManager.UpdateCheckCallback() {
                     @Override
                     public void onUpdatesAvailable(java.util.List<ModelManager.ModelInfo> updates) {
-                        // User chose "Later" - updates are pending
                         Log.d(TAG, updates.size() + " model updates available");
                     }
 

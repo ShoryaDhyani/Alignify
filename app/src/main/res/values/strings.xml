@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Alignify</string>
+    <!-- Google OAuth Web Client ID — auto-generated from google-services.json by the Google Services plugin -->
+    <!-- If building without google-services.json, replace with your Web Client ID from Firebase console -->
+    <string name="default_web_client_id" translatable="false">YOUR_GOOGLE_WEB_CLIENT_ID</string>
     <string name="permission_camera_rationale">Camera permission is required to detect exercise poses</string>
     <string name="reps">Reps: %d</string>
     <string name="start">Start</string>

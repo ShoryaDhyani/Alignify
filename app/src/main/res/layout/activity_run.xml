@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:orientation="vertical">
 
-    <!-- Full-screen Map background -->
-    <fragment
-        android:id="@+id/mapFragment"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- Full-screen Map background -->
+        <com.mapbox.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="859dp" />
 
     <!-- Top: back button + Run/Walk tabs -->
     <LinearLayout
@@ -79,185 +85,207 @@
     </LinearLayout>
 
     <!-- Bottom overlay -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="24dp">
-
-        <!-- Status pill -->
-        <TextView
-            android:id="@+id/tvRunStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_rounded_card"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="4dp"
-            android:text="Ready"
-            android:textColor="@color/accent"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:alpha="0.85" />
-
-        <!-- Timer -->
-        <TextView
-            android:id="@+id/tvRunTimer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="00:00:00"
-            android:textColor="@color/text_primary_dark"
-            android:textSize="44sp"
-            android:textStyle="bold"
-            android:shadowColor="#40000000"
-            android:shadowDx="0"
-            android:shadowDy="1"
-            android:shadowRadius="3" />
-
-        <!-- Distance -->
-        <TextView
-            android:id="@+id/tvRunDistance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0.00 km"
-            android:textColor="@color/accent"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:shadowColor="#40000000"
-            android:shadowDx="0"
-            android:shadowDy="1"
-            android:shadowRadius="3" />
-
-        <!-- Stats row: speed | steps | cal | pace -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:layout_height="298dp"
+            android:layout_gravity="bottom"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="24dp">
 
-            <!-- Speed -->
+            <!-- Status pill -->
             <TextView
-                android:id="@+id/tvRunAvgSpeed"
-                android:layout_width="0dp"
+                android:id="@+id/tvRunStatus"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_stat_pill"
-                android:gravity="center"
-                android:paddingVertical="10dp"
-                android:text="0.0 km/h"
-                android:textColor="@color/text_primary_dark"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginEnd="4dp" />
+                android:alpha="0.85"
+                android:background="@drawable/bg_rounded_card"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="4dp"
+                android:text="Ready"
+                android:textColor="@color/accent"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
-            <!-- Steps -->
+            <!-- Timer -->
             <TextView
-                android:id="@+id/tvRunSteps"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_stat_pill"
-                android:gravity="center"
-                android:paddingVertical="10dp"
-                android:text="0 steps"
+                android:id="@+id/tvRunTimer"
+                android:layout_width="wrap_content"
+                android:layout_height="56dp"
+                android:layout_marginTop="4dp"
+                android:shadowColor="#40000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="3"
+                android:text="00:00:00"
                 android:textColor="@color/text_primary_dark"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginHorizontal="4dp" />
+                android:textSize="44sp"
+                android:textStyle="bold" />
 
-            <!-- Calories -->
+            <!-- Distance -->
             <TextView
-                android:id="@+id/tvRunCalories"
-                android:layout_width="0dp"
+                android:id="@+id/tvRunDistance"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_stat_pill"
-                android:gravity="center"
-                android:paddingVertical="10dp"
-                android:text="0 cal"
-                android:textColor="@color/text_primary_dark"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginHorizontal="4dp" />
+                android:shadowColor="#40000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="3"
+                android:text="0.00 km"
+                android:textColor="@color/accent"
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
-            <!-- Pace -->
-            <TextView
-                android:id="@+id/tvRunPace"
-                android:layout_width="0dp"
+            <!-- Stats row: speed | steps | cal | pace -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_stat_pill"
-                android:gravity="center"
-                android:paddingVertical="10dp"
-                android:text="0'00&quot;/km"
-                android:textColor="@color/text_primary_dark"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginStart="4dp" />
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <!-- Speed -->
+                <TextView
+                    android:id="@+id/tvRunAvgSpeed"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_stat_pill"
+                    android:gravity="center"
+                    android:paddingVertical="10dp"
+                    android:text="0.0 km/h"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <!-- Steps -->
+                <TextView
+                    android:id="@+id/tvRunSteps"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_stat_pill"
+                    android:gravity="center"
+                    android:paddingVertical="10dp"
+                    android:text="0 steps"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- Controls -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="74dp"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:id="@+id/tvRunPace"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_stat_pill"
+                    android:gravity="center"
+                    android:paddingVertical="10dp"
+                    android:text="0'00&quot;/km"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/btnRunStop"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnRunStop"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="Stop"
+                    android:src="@drawable/ic_close"
+                    android:visibility="gone"
+                    app:backgroundTint="@color/btn_stop_red"
+                    app:fabCustomSize="44dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/btnRunStartPause"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:maxImageSize="18dp"
+                    app:tint="@android:color/white" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnRunStartPause"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="Start"
+                    android:src="@drawable/ic_play"
+                    app:backgroundTint="@color/streak_active"
+                    app:fabCustomSize="60dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:maxImageSize="26dp"
+                    app:tint="@android:color/white" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnRunLock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="Lock"
+                    android:src="@drawable/ic_lock"
+                    android:visibility="gone"
+                    app:backgroundTint="@color/btn_disabled_grey"
+                    app:fabCustomSize="44dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toEndOf="@id/btnRunStartPause"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:maxImageSize="18dp"
+                    app:tint="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tvRunCalories"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="16dp"
+                    android:background="@drawable/bg_stat_pill"
+                    android:gravity="center"
+                    android:paddingVertical="10dp"
+                    android:text="0 cal"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@id/btnRunLock"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Hint -->
+            <TextView
+                android:id="@+id/tvRunHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:shadowColor="#40000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="3"
+                android:text="Tap Start to begin your run"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="13sp" />
 
         </LinearLayout>
 
-        <!-- Controls -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:orientation="horizontal">
+    </FrameLayout>
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/btnRunStop"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="24dp"
-                android:contentDescription="Stop"
-                android:src="@drawable/ic_close"
-                android:visibility="gone"
-                app:backgroundTint="@color/btn_stop_red"
-                app:fabSize="normal"
-                app:tint="@android:color/white" />
+    <!-- Bottom Navigation Bar -->
+    <include layout="@layout/layout_bottom_navbar" />
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/btnRunStartPause"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="Start"
-                android:src="@drawable/ic_play"
-                app:backgroundTint="@color/streak_active"
-                app:fabCustomSize="64dp"
-                app:tint="@android:color/white" />
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/btnRunLock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="24dp"
-                android:contentDescription="Lock"
-                android:src="@drawable/ic_lock"
-                android:visibility="gone"
-                app:backgroundTint="@color/btn_disabled_grey"
-                app:fabSize="normal"
-                app:tint="@android:color/white" />
-
-        </LinearLayout>
-
-        <!-- Hint -->
-        <TextView
-            android:id="@+id/tvRunHint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Tap Start to begin your run"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="13sp"
-            android:shadowColor="#40000000"
-            android:shadowDx="0"
-            android:shadowDy="1"
-            android:shadowRadius="3" />
-
-    </LinearLayout>
-
-</FrameLayout>
+</LinearLayout>

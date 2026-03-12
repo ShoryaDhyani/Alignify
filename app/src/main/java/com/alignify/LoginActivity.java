@@ -49,8 +49,7 @@ public class LoginActivity extends AppCompatActivity {
     private static final String KEY_USER_AGE = "user_age";
     private static final String KEY_USER_GENDER = "user_gender";
 
-    // Google OAuth Web Client ID
-    private static final String GOOGLE_CLIENT_ID = "135631564844-07m3vdbe2t64gmnncbrjedbt6mili3p7.apps.googleusercontent.com";
+    // Google OAuth Web Client ID — loaded from R.string.default_web_client_id (auto-generated from google-services.json)
 
     private EditText emailInput;
     private EditText passwordInput;
@@ -92,7 +91,7 @@ public class LoginActivity extends AppCompatActivity {
 
         // Configure Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(GOOGLE_CLIENT_ID)
+                .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
 
@@ -605,7 +604,7 @@ public class LoginActivity extends AppCompatActivity {
 
         Intent intent;
         if (profileComplete) {
-            intent = new Intent(this, DashboardActivity.class);
+            intent = new Intent(this, HomeActivity.class);
         } else {
             intent = new Intent(this, ProfileSetupActivity.class);
         }

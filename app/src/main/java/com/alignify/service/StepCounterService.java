@@ -19,7 +19,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.alignify.DashboardActivity;
+import com.alignify.HomeActivity;
 import com.alignify.R;
 import com.alignify.data.UserRepository;
 import com.alignify.engine.CaloriesEngine;
@@ -267,7 +267,7 @@ public class StepCounterService extends Service implements SensorEventListener {
      * Creates the persistent notification for the foreground service.
      */
     private Notification createNotification(int steps) {
-        Intent notificationIntent = new Intent(this, DashboardActivity.class);
+        Intent notificationIntent = new Intent(this, HomeActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
                 0,

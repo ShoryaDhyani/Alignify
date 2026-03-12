@@ -1,6 +1,7 @@
 package com.alignify.exercises;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.utils.LandmarkUtils;
@@ -87,16 +88,20 @@ public class LungeDetector extends ExerciseDetector {
 
         // Use ML model if available for additional error detection
         if (tfliteInterpreter != null) {
-            float[] features = LandmarkUtils.extractLungeFeatures(result);
-            if (features != null) {
-                int prediction = tfliteInterpreter.predictClass(features);
-                if (prediction == 1) {
-                    errors.add("Torso leaning - keep upright");
-                    isCorrect = false;
-                } else if (prediction == 2) {
-                    errors.add("Back knee too high - lower it");
-                    isCorrect = false;
+            try {
+                float[] features = LandmarkUtils.extractLungeFeatures(result);
+                if (features != null) {
+                    int prediction = tfliteInterpreter.predictClass(features);
+                    if (prediction == 1) {
+                        errors.add("Torso leaning - keep upright");
+                        isCorrect = false;
+                    } else if (prediction == 2) {
+                        errors.add("Back knee too high - lower it");
+                        isCorrect = false;
+                    }
                 }
+            } catch (Exception e) {
+                Log.w("LungeDetector", "ML inference failed", e);
             }
         }
 

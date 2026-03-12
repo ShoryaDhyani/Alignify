@@ -1,163 +1,166 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bottom Navigation Bar - Include this in all main activities -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Bottom Navigation Bar with elevated center Record button (Strava-style) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/bottomNavContainer"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="@color/card_background_light"
-    android:elevation="8dp"
-    android:gravity="center"
-    android:orientation="horizontal"
-    android:paddingVertical="12dp">
+    android:layout_height="80dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
-    <!-- Home -->
+    <!-- Nav bar background (56dp) at bottom -->
     <LinearLayout
-        android:id="@+id/navHome"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        android:background="@color/card_background_light"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <ImageView
-            android:id="@+id/navHomeIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_home"
-            app:tint="@color/text_secondary_dark" />
+        <!-- Home -->
+        <LinearLayout
+            android:id="@+id/navHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/navHomeLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Home"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="10sp"
-            android:visibility="gone" />
+            <ImageView
+                android:id="@+id/navHomeIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_home"
+                app:tint="@color/text_secondary_dark" />
+
+            <TextView
+                android:id="@+id/navHomeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Home"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Exercises -->
+        <LinearLayout
+            android:id="@+id/navExercises"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/navExercisesIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_fitness"
+                app:tint="@color/text_secondary_dark" />
+
+            <TextView
+                android:id="@+id/navExercisesLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Workout"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Center spacer for the elevated record button -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Analytics -->
+        <LinearLayout
+            android:id="@+id/navAnalytics"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/navAnalyticsIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_history"
+                app:tint="@color/text_secondary_dark" />
+
+            <TextView
+                android:id="@+id/navAnalyticsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Analytics"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Profile -->
+        <LinearLayout
+            android:id="@+id/navProfile"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/navProfileIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_profile"
+                app:tint="@color/text_secondary_dark" />
+
+            <TextView
+                android:id="@+id/navProfileLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Profile"
+                android:textColor="@color/text_secondary_dark"
+                android:textSize="10sp" />
+        </LinearLayout>
 
     </LinearLayout>
 
-    <!-- Exercises -->
-    <LinearLayout
-        android:id="@+id/navExercises"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:id="@+id/navExercisesIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_fitness"
-            app:tint="@color/text_secondary_dark" />
-
-        <TextView
-            android:id="@+id/navExercisesLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Exercises"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="10sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-    <!-- Run -->
-    <LinearLayout
+    <!-- Elevated center Record button (Strava-style) -->
+    <FrameLayout
         android:id="@+id/navRun"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="0dp"
+        android:background="@drawable/bg_nav_record_button"
         android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:elevation="12dp"
+        android:focusable="true">
 
         <ImageView
             android:id="@+id/navRunIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
             android:src="@drawable/ic_steps"
-            app:tint="@color/text_secondary_dark" />
+            app:tint="@android:color/white" />
+    </FrameLayout>
 
-        <TextView
-            android:id="@+id/navRunLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Run"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="10sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-    <!-- Analytics -->
-    <LinearLayout
-        android:id="@+id/navAnalytics"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:id="@+id/navAnalyticsIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_history"
-            app:tint="@color/text_secondary_dark" />
-
-        <TextView
-            android:id="@+id/navAnalyticsLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Analytics"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="10sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-    <!-- Profile/Settings -->
-    <LinearLayout
-        android:id="@+id/navProfile"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ImageView
-            android:id="@+id/navProfileIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_profile"
-            app:tint="@color/text_secondary_dark" />
-
-        <TextView
-            android:id="@+id/navProfileLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Profile"
-            android:textColor="@color/text_secondary_dark"
-            android:textSize="10sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>

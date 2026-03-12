@@ -2,24 +2,23 @@ package com.alignify;
 
 import android.graphics.Color;
 import android.os.Bundle;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
 import com.alignify.service.WaterReminderService;
-import com.alignify.util.NavigationHelper;
 import com.alignify.util.WaterTrackingHelper;
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
@@ -36,17 +35,16 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Activity/Analytics screen with redesigned UI.
- * Shows week calendar, today's stats, and water tracking.
+ * Analytics/Activity fragment with charts and water tracking.
+ * Converted from ActivityActivity for ViewPager2-based navigation.
  */
-public class ActivityActivity extends AppCompatActivity {
+public class AnalyticsFragment extends Fragment {
 
-    private static final String TAG = "ActivityActivity";
+    private static final String TAG = "AnalyticsFragment";
 
     // Views
     private TextView tvMonthYear;
@@ -62,12 +60,6 @@ public class ActivityActivity extends AppCompatActivity {
     private ImageButton btnAddWater;
     private ImageButton btnRemoveWater;
 
-    // Navigation
-    private LinearLayout navHome;
-    private LinearLayout navExercises;
-    private LinearLayout navAnalytics;
-    private LinearLayout navProfile;
-
     // Data
     private FitnessDataManager fitnessDataManager;
     private WaterTrackingHelper waterHelper;
@@ -75,67 +67,59 @@ public class ActivityActivity extends AppCompatActivity {
     private List<DayItem> weekDays = new ArrayList<>();
     private DailyActivity todayActivity;
 
-    // Swipe navigation
-    private GestureDetector swipeDetector;
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_activity, container, false);
+    }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_activity);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-        // Initialize FitnessDataManager (single source of truth for fitness data)
-        fitnessDataManager = FitnessDataManager.getInstance(this);
-        waterHelper = new WaterTrackingHelper(this);
+        // Hide the bottom nav bar from the inflated layout
+        View bottomNav = view.findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.GONE);
+        }
+
+        fitnessDataManager = FitnessDataManager.getInstance(requireContext());
+        waterHelper = new WaterTrackingHelper(requireContext());
         selectedDate = Calendar.getInstance();
 
-        initViews();
-        setupListeners();
+        initViews(view);
+        setupListeners(view);
         setupWeekCalendar();
         loadData();
         scheduleWaterReminders();
-
-        // Setup swipe navigation
-        swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_ANALYTICS);
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (swipeDetector != null) {
-            swipeDetector.onTouchEvent(ev);
-        }
-        return super.dispatchTouchEvent(ev);
-    }
-
-    @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
+        if (!isAdded())
+            return;
         updateWaterUI();
         loadData();
     }
 
-    private void initViews() {
-        tvMonthYear = findViewById(R.id.tvMonthYear);
-        weekCalendar = findViewById(R.id.weekCalendar);
-        tvCalories = findViewById(R.id.tvCalories);
-        tvTrainingPercent = findViewById(R.id.tvTrainingPercent);
-        progressTraining = findViewById(R.id.progressTraining);
-        tvHeartRate = findViewById(R.id.tvHeartRate);
-        tvSteps = findViewById(R.id.tvSteps);
-        tvSleep = findViewById(R.id.tvSleep);
-        tvWaterCups = findViewById(R.id.tvWaterCups);
-        progressWater = findViewById(R.id.progressWater);
-        btnAddWater = findViewById(R.id.btnAddWater);
-        btnRemoveWater = findViewById(R.id.btnRemoveWater);
-
-        // Navigation
-        navHome = findViewById(R.id.navHome);
-        navExercises = findViewById(R.id.navExercises);
-        navAnalytics = findViewById(R.id.navAnalytics);
-        navProfile = findViewById(R.id.navProfile);
+    private void initViews(View view) {
+        tvMonthYear = view.findViewById(R.id.tvMonthYear);
+        weekCalendar = view.findViewById(R.id.weekCalendar);
+        tvCalories = view.findViewById(R.id.tvCalories);
+        tvTrainingPercent = view.findViewById(R.id.tvTrainingPercent);
+        progressTraining = view.findViewById(R.id.progressTraining);
+        tvHeartRate = view.findViewById(R.id.tvHeartRate);
+        tvSteps = view.findViewById(R.id.tvSteps);
+        tvSleep = view.findViewById(R.id.tvSleep);
+        tvWaterCups = view.findViewById(R.id.tvWaterCups);
+        progressWater = view.findViewById(R.id.progressWater);
+        btnAddWater = view.findViewById(R.id.btnAddWater);
+        btnRemoveWater = view.findViewById(R.id.btnRemoveWater);
     }
 
-    private void setupListeners() {
-        // Water tracking - use FitnessDataManager for consistent data
+    private void setupListeners(View view) {
         btnAddWater.setOnClickListener(v -> {
             fitnessDataManager.addWaterCup();
             updateWaterUI();
@@ -146,22 +130,16 @@ public class ActivityActivity extends AppCompatActivity {
             updateWaterUI();
         });
 
-        // Steps card click - open step tracking activity
-        View stepsCard = findViewById(R.id.stepsCard);
+        View stepsCard = view.findViewById(R.id.stepsCard);
         if (stepsCard != null) {
             stepsCard.setOnClickListener(v -> showStepsBottomSheet());
         }
-
-        // Bottom navigation
-        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_ANALYTICS,
-                navHome, navExercises, navAnalytics, navProfile);
     }
 
     private void setupWeekCalendar() {
         weekCalendar.removeAllViews();
         weekDays.clear();
 
-        // Get current week (Sunday to Saturday)
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
 
@@ -182,30 +160,26 @@ public class ActivityActivity extends AppCompatActivity {
             cal.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        // Update month/year text
         SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM yyyy", Locale.US);
         tvMonthYear.setText(monthFormat.format(selectedDate.getTime()));
     }
 
     private View createDayView(DayItem dayItem, int index) {
-        LinearLayout container = new LinearLayout(this);
-        container.setLayoutParams(new LinearLayout.LayoutParams(
-                dpToPx(48), LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(48), LinearLayout.LayoutParams.WRAP_CONTENT));
         container.setOrientation(LinearLayout.VERTICAL);
         container.setGravity(Gravity.CENTER);
         container.setPadding(dpToPx(4), dpToPx(8), dpToPx(4), dpToPx(8));
 
-        // Day label (S, M, T, etc.)
-        TextView labelView = new TextView(this);
+        TextView labelView = new TextView(requireContext());
         labelView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         labelView.setText(dayItem.dayLabel);
         labelView.setTextSize(12);
-        labelView.setTextColor(getColor(R.color.text_secondary_dark));
+        labelView.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
         labelView.setGravity(Gravity.CENTER);
 
-        // Day number in circle
-        TextView numberView = new TextView(this);
+        TextView numberView = new TextView(requireContext());
         LinearLayout.LayoutParams numberParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
         numberParams.topMargin = dpToPx(4);
         numberView.setLayoutParams(numberParams);
@@ -215,16 +189,15 @@ public class ActivityActivity extends AppCompatActivity {
 
         if (dayItem.isSelected || dayItem.isToday) {
             numberView.setBackgroundResource(R.drawable.bg_day_selected);
-            numberView.setTextColor(getColor(R.color.text_primary_dark));
+            numberView.setTextColor(requireContext().getColor(R.color.text_primary_dark));
         } else {
             numberView.setBackgroundResource(R.drawable.bg_day_unselected);
-            numberView.setTextColor(getColor(R.color.text_secondary_dark));
+            numberView.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
         }
 
         container.addView(labelView);
         container.addView(numberView);
 
-        // Click listener - show activity history bottom sheet
         container.setOnClickListener(v -> {
             selectedDate = (Calendar) dayItem.date.clone();
             setupWeekCalendar();
@@ -236,16 +209,16 @@ public class ActivityActivity extends AppCompatActivity {
     }
 
     private void showActivityHistoryBottomSheet(Calendar date) {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View sheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_activity_history, null);
+        if (!isAdded())
+            return;
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View sheetView = LayoutInflater.from(requireContext()).inflate(R.layout.bottom_sheet_activity_history, null);
         bottomSheetDialog.setContentView(sheetView);
 
-        // Set date header
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM d", Locale.US);
         TextView tvHistoryDate = sheetView.findViewById(R.id.tvHistoryDate);
         tvHistoryDate.setText(dateFormat.format(date.getTime()));
 
-        // Get views
         TextView tvHistorySteps = sheetView.findViewById(R.id.tvHistorySteps);
         TextView tvHistoryCalories = sheetView.findViewById(R.id.tvHistoryCalories);
         TextView tvHistoryWater = sheetView.findViewById(R.id.tvHistoryWater);
@@ -253,16 +226,15 @@ public class ActivityActivity extends AppCompatActivity {
         LineChart chartExerciseMinutes = sheetView.findViewById(R.id.chartExerciseMinutes);
         LinearLayout exerciseBreakdownContainer = sheetView.findViewById(R.id.exerciseBreakdownContainer);
 
-        // Load data for selected date
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
         UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
-            runOnUiThread(() -> {
+            if (!isAdded())
+                return;
+            requireActivity().runOnUiThread(() -> {
                 if (activity != null) {
                     tvHistorySteps.setText(String.valueOf(activity.getSteps()));
                     tvHistoryCalories.setText(String.valueOf(activity.getCalories()));
                     tvHistoryWater.setText(String.valueOf(waterHelper.getWaterCups()));
-
-                    // Populate exercise breakdown
                     populateExerciseBreakdown(exerciseBreakdownContainer, activity);
                 } else {
                     tvHistorySteps.setText("0");
@@ -272,59 +244,46 @@ public class ActivityActivity extends AppCompatActivity {
             });
         });
 
-        // Setup charts
         setupWeeklyActivityChart(chartWeeklyActivity, date);
         setupExerciseMinutesChart(chartExerciseMinutes, date);
 
-        // Close button
         sheetView.findViewById(R.id.btnCloseHistory).setOnClickListener(v -> bottomSheetDialog.dismiss());
-
         bottomSheetDialog.show();
     }
 
     private void setupWeeklyActivityChart(BarChart chart, Calendar selectedDate) {
-        // Get week data from Firebase
         Calendar cal = (Calendar) selectedDate.clone();
         cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
 
         String[] dayLabels = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         int selectedDayIndex = selectedDate.get(Calendar.DAY_OF_WEEK) - 1;
 
-        // Store date keys for the week
         String[] dateKeys = new String[7];
         for (int i = 0; i < 7; i++) {
             dateKeys[i] = DailyActivity.dateKey(cal.getTimeInMillis());
             cal.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        // Load data for all 7 days
         float[] stepsData = new float[7];
         int[] loadedCount = { 0 };
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
             UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
-                if (activity != null) {
-                    stepsData[index] = activity.getSteps();
-                } else {
-                    stepsData[index] = 0;
-                }
+                stepsData[index] = activity != null ? activity.getSteps() : 0;
                 loadedCount[0]++;
 
-                // When all data is loaded, update the chart
-                if (loadedCount[0] == 7) {
-                    runOnUiThread(() -> {
+                if (loadedCount[0] == 7 && isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
                         List<BarEntry> stepsEntries = new ArrayList<>();
                         for (int j = 0; j < 7; j++) {
                             stepsEntries.add(new BarEntry(j, stepsData[j]));
                         }
 
                         BarDataSet dataSet = new BarDataSet(stepsEntries, "Steps");
-
-                        // Color bars - highlight selected day
                         int[] colors = new int[7];
-                        int accentColor = getColor(R.color.accent);
-                        int lightColor = getColor(R.color.card_steps);
+                        int accentColor = requireContext().getColor(R.color.accent);
+                        int lightColor = requireContext().getColor(R.color.card_steps);
                         for (int j = 0; j < 7; j++) {
                             colors[j] = (j == selectedDayIndex) ? accentColor : lightColor;
                         }
@@ -342,18 +301,16 @@ public class ActivityActivity extends AppCompatActivity {
                         chart.setDrawBorders(false);
                         chart.setTouchEnabled(false);
 
-                        // X axis
                         XAxis xAxis = chart.getXAxis();
                         xAxis.setValueFormatter(new IndexAxisValueFormatter(dayLabels));
                         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
                         xAxis.setDrawGridLines(false);
                         xAxis.setGranularity(1f);
-                        xAxis.setTextColor(getColor(R.color.text_secondary_dark));
+                        xAxis.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
 
-                        // Y axis
                         chart.getAxisLeft().setDrawGridLines(true);
-                        chart.getAxisLeft().setGridColor(getColor(R.color.divider_light));
-                        chart.getAxisLeft().setTextColor(getColor(R.color.text_secondary_dark));
+                        chart.getAxisLeft().setGridColor(requireContext().getColor(R.color.divider_light));
+                        chart.getAxisLeft().setTextColor(requireContext().getColor(R.color.text_secondary_dark));
                         chart.getAxisLeft().setAxisMinimum(0f);
                         chart.getAxisRight().setEnabled(false);
 
@@ -370,46 +327,38 @@ public class ActivityActivity extends AppCompatActivity {
         cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
 
         String[] dayLabels = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-        int selectedDayIndex = selectedDate.get(Calendar.DAY_OF_WEEK) - 1;
 
-        // Store date keys for the week
         String[] dateKeys = new String[7];
         for (int i = 0; i < 7; i++) {
             dateKeys[i] = DailyActivity.dateKey(cal.getTimeInMillis());
             cal.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        // Load data for all 7 days
         float[] minutesData = new float[7];
         int[] loadedCount = { 0 };
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
             UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
-                if (activity != null) {
-                    minutesData[index] = activity.getActiveMinutes();
-                } else {
-                    minutesData[index] = 0;
-                }
+                minutesData[index] = activity != null ? activity.getActiveMinutes() : 0;
                 loadedCount[0]++;
 
-                // When all data is loaded, update the chart
-                if (loadedCount[0] == 7) {
-                    runOnUiThread(() -> {
+                if (loadedCount[0] == 7 && isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
                         List<Entry> entries = new ArrayList<>();
                         for (int j = 0; j < 7; j++) {
                             entries.add(new Entry(j, minutesData[j]));
                         }
 
                         LineDataSet dataSet = new LineDataSet(entries, "Exercise Minutes");
-                        dataSet.setColor(getColor(R.color.accent));
-                        dataSet.setCircleColor(getColor(R.color.accent));
+                        dataSet.setColor(requireContext().getColor(R.color.accent));
+                        dataSet.setCircleColor(requireContext().getColor(R.color.accent));
                         dataSet.setLineWidth(2f);
                         dataSet.setCircleRadius(4f);
                         dataSet.setDrawCircleHole(true);
                         dataSet.setCircleHoleRadius(2f);
                         dataSet.setDrawFilled(true);
-                        dataSet.setFillColor(getColor(R.color.accent));
+                        dataSet.setFillColor(requireContext().getColor(R.color.accent));
                         dataSet.setFillAlpha(50);
                         dataSet.setDrawValues(false);
                         dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
@@ -422,18 +371,16 @@ public class ActivityActivity extends AppCompatActivity {
                         chart.setDrawGridBackground(false);
                         chart.setTouchEnabled(false);
 
-                        // X axis
                         XAxis xAxis = chart.getXAxis();
                         xAxis.setValueFormatter(new IndexAxisValueFormatter(dayLabels));
                         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
                         xAxis.setDrawGridLines(false);
                         xAxis.setGranularity(1f);
-                        xAxis.setTextColor(getColor(R.color.text_secondary_dark));
+                        xAxis.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
 
-                        // Y axis
                         chart.getAxisLeft().setDrawGridLines(true);
-                        chart.getAxisLeft().setGridColor(getColor(R.color.divider_light));
-                        chart.getAxisLeft().setTextColor(getColor(R.color.text_secondary_dark));
+                        chart.getAxisLeft().setGridColor(requireContext().getColor(R.color.divider_light));
+                        chart.getAxisLeft().setTextColor(requireContext().getColor(R.color.text_secondary_dark));
                         chart.getAxisLeft().setAxisMinimum(0f);
                         chart.getAxisRight().setEnabled(false);
 
@@ -448,7 +395,6 @@ public class ActivityActivity extends AppCompatActivity {
     private void populateExerciseBreakdown(LinearLayout container, DailyActivity activity) {
         container.removeAllViews();
 
-        // Exercise types and their icons/colors
         String[][] exercises = {
                 { "Squats", String.valueOf(activity.getSquatReps()), "#4CAF50" },
                 { "Bicep Curls", String.valueOf(activity.getBicepCurlReps()), "#2196F3" },
@@ -458,37 +404,32 @@ public class ActivityActivity extends AppCompatActivity {
 
         for (String[] exercise : exercises) {
             if (Integer.parseInt(exercise[1].replace("s", "")) > 0) {
-                LinearLayout row = new LinearLayout(this);
+                LinearLayout row = new LinearLayout(requireContext());
                 row.setLayoutParams(new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setPadding(0, dpToPx(8), 0, dpToPx(8));
                 row.setGravity(Gravity.CENTER_VERTICAL);
 
-                // Color indicator
-                View colorDot = new View(this);
+                View colorDot = new View(requireContext());
                 LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dpToPx(8), dpToPx(8));
                 dotParams.setMarginEnd(dpToPx(12));
                 colorDot.setLayoutParams(dotParams);
                 colorDot.setBackgroundColor(Color.parseColor(exercise[2]));
 
-                // Exercise name
-                TextView tvName = new TextView(this);
+                TextView tvName = new TextView(requireContext());
                 LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
                         0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
                 tvName.setLayoutParams(nameParams);
                 tvName.setText(exercise[0]);
-                tvName.setTextColor(getColor(R.color.text_primary_dark));
+                tvName.setTextColor(requireContext().getColor(R.color.text_primary_dark));
                 tvName.setTextSize(14);
 
-                // Reps/time
-                TextView tvValue = new TextView(this);
+                TextView tvValue = new TextView(requireContext());
                 tvValue.setLayoutParams(new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                 tvValue.setText(exercise[1] + (exercise[0].equals("Planks") ? "" : " reps"));
-                tvValue.setTextColor(getColor(R.color.text_secondary_dark));
+                tvValue.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
                 tvValue.setTextSize(14);
 
                 row.addView(colorDot);
@@ -498,14 +439,12 @@ public class ActivityActivity extends AppCompatActivity {
             }
         }
 
-        // If no exercises, show placeholder
         if (container.getChildCount() == 0) {
-            TextView placeholder = new TextView(this);
+            TextView placeholder = new TextView(requireContext());
             placeholder.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             placeholder.setText("No exercises recorded for this day");
-            placeholder.setTextColor(getColor(R.color.text_secondary_dark));
+            placeholder.setTextColor(requireContext().getColor(R.color.text_secondary_dark));
             placeholder.setTextSize(14);
             placeholder.setGravity(Gravity.CENTER);
             placeholder.setPadding(0, dpToPx(16), 0, dpToPx(16));
@@ -521,38 +460,37 @@ public class ActivityActivity extends AppCompatActivity {
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
 
         UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
-            runOnUiThread(() -> {
+            if (!isAdded())
+                return;
+            requireActivity().runOnUiThread(() -> {
                 if (activity != null) {
                     todayActivity = activity;
                     updateStatsUI(activity);
                 } else {
-                    // No data for this date, show defaults
                     todayActivity = new DailyActivity(dateKey);
                     updateStatsUI(todayActivity);
                 }
             });
         });
 
-        // Update water UI (always uses today's data from SharedPreferences)
         updateWaterUI();
     }
 
     private void updateStatsUI(DailyActivity activity) {
-        // Calories
+        if (!isAdded())
+            return;
+
         tvCalories.setText(activity.getCalories() + " Cal");
 
-        // Steps - use FitnessDataManager for consistent step goal
         int stepGoal = fitnessDataManager.getStepGoal();
         tvSteps.setText(activity.getSteps() + "/" + stepGoal);
 
-        // Training time (calculate percentage of goal from FitnessDataManager)
         int trainingGoal = fitnessDataManager.getActiveTimeGoal();
         int activeMinutes = activity.getActiveMinutes();
         int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
         tvTrainingPercent.setText(trainingPercent + "%");
         progressTraining.setProgress(trainingPercent);
 
-        // Sleep
         float sleepHours = activity.getSleepHours();
         if (sleepHours > 0) {
             tvSleep.setText(String.format(Locale.US, "%.1f hrs", sleepHours));
@@ -560,12 +498,12 @@ public class ActivityActivity extends AppCompatActivity {
             tvSleep.setText("-- hrs");
         }
 
-        // Heart rate (placeholder - would need health connect integration)
         tvHeartRate.setText("-- Bpm");
     }
 
     private void updateWaterUI() {
-        // Use FitnessDataManager for water tracking (consistent with other activities)
+        if (!isAdded())
+            return;
         int cups = fitnessDataManager.getWaterCupsToday();
         int goal = fitnessDataManager.getWaterGoal();
         int progress = fitnessDataManager.getWaterProgressPercent();
@@ -575,12 +513,69 @@ public class ActivityActivity extends AppCompatActivity {
     }
 
     private void scheduleWaterReminders() {
+        if (!isAdded())
+            return;
         try {
-            WaterReminderService.scheduleReminders(this);
+            WaterReminderService.scheduleReminders(requireContext());
         } catch (SecurityException e) {
-            // Exact alarm permission not granted - reminders will use inexact timing
             e.printStackTrace();
         }
+    }
+
+    private void showStepsBottomSheet() {
+        if (!isAdded())
+            return;
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View sheetView = LayoutInflater.from(requireContext()).inflate(R.layout.bottom_sheet_steps, null);
+        bottomSheetDialog.setContentView(sheetView);
+
+        ProgressBar progressSteps = sheetView.findViewById(R.id.progressSteps);
+        TextView tvCurrentSteps = sheetView.findViewById(R.id.tvCurrentSteps);
+        TextView tvGoalSteps = sheetView.findViewById(R.id.tvGoalSteps);
+        TextView tvStepMotivation = sheetView.findViewById(R.id.tvStepMotivation);
+        TextView tvDistance = sheetView.findViewById(R.id.tvDistance);
+        TextView tvStepCalories = sheetView.findViewById(R.id.tvStepCalories);
+        TextView tvActiveTime = sheetView.findViewById(R.id.tvActiveTime);
+
+        int currentSteps = fitnessDataManager.getStepsToday();
+        int goalSteps = fitnessDataManager.getStepGoal();
+
+        if (todayActivity != null && todayActivity.getSteps() > currentSteps) {
+            currentSteps = todayActivity.getSteps();
+        }
+
+        int progressPercent = goalSteps > 0 ? (int) ((currentSteps * 100.0f) / goalSteps) : 0;
+        progressPercent = Math.min(progressPercent, 100);
+
+        tvCurrentSteps.setText(String.valueOf(currentSteps));
+        tvGoalSteps.setText("of " + goalSteps);
+        progressSteps.setMax(100);
+        progressSteps.setProgress(progressPercent);
+
+        float distanceKm = fitnessDataManager.getDistanceToday();
+        int calories = fitnessDataManager.getCaloriesToday();
+        int activeMinutes = fitnessDataManager.getActiveMinutesToday();
+
+        tvDistance.setText(String.format(Locale.US, "%.1f km", distanceKm));
+        tvStepCalories.setText(String.valueOf(calories));
+        tvActiveTime.setText(activeMinutes + " min");
+
+        if (progressPercent >= 100) {
+            tvStepMotivation.setText("Goal achieved! You're a champion!");
+        } else if (progressPercent >= 75) {
+            tvStepMotivation.setText("Almost there! " + (goalSteps - currentSteps) + " steps to go!");
+        } else if (progressPercent >= 50) {
+            tvStepMotivation.setText("Halfway there! Keep moving!");
+        } else if (progressPercent >= 25) {
+            tvStepMotivation.setText("Great start! Keep it up!");
+        } else {
+            tvStepMotivation.setText("Start your day with a walk!");
+        }
+
+        sheetView.findViewById(R.id.btnSetStepGoal).setOnClickListener(v -> bottomSheetDialog.dismiss());
+        sheetView.findViewById(R.id.btnCloseSteps).setOnClickListener(v -> bottomSheetDialog.dismiss());
+
+        bottomSheetDialog.show();
     }
 
     private boolean isSameDay(Calendar cal1, Calendar cal2) {
@@ -592,74 +587,6 @@ public class ActivityActivity extends AppCompatActivity {
         return (int) (dp * getResources().getDisplayMetrics().density);
     }
 
-    private void showStepsBottomSheet() {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View sheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_steps, null);
-        bottomSheetDialog.setContentView(sheetView);
-
-        // Get views
-        ProgressBar progressSteps = sheetView.findViewById(R.id.progressSteps);
-        TextView tvCurrentSteps = sheetView.findViewById(R.id.tvCurrentSteps);
-        TextView tvGoalSteps = sheetView.findViewById(R.id.tvGoalSteps);
-        TextView tvStepMotivation = sheetView.findViewById(R.id.tvStepMotivation);
-        TextView tvDistance = sheetView.findViewById(R.id.tvDistance);
-        TextView tvStepCalories = sheetView.findViewById(R.id.tvStepCalories);
-        TextView tvActiveTime = sheetView.findViewById(R.id.tvActiveTime);
-
-        // Use FitnessDataManager for consistent step goal across all activities
-        int currentSteps = fitnessDataManager.getStepsToday();
-        int goalSteps = fitnessDataManager.getStepGoal();
-
-        if (todayActivity != null && todayActivity.getSteps() > currentSteps) {
-            currentSteps = todayActivity.getSteps();
-        }
-
-        int progressPercent = goalSteps > 0 ? (int) ((currentSteps * 100.0f) / goalSteps) : 0;
-        progressPercent = Math.min(progressPercent, 100);
-
-        // Update UI
-        tvCurrentSteps.setText(String.valueOf(currentSteps));
-        tvGoalSteps.setText("of " + goalSteps);
-        progressSteps.setMax(100);
-        progressSteps.setProgress(progressPercent);
-
-        // Use FitnessDataManager calculated values for consistency
-        float distanceKm = fitnessDataManager.getDistanceToday();
-        int calories = fitnessDataManager.getCaloriesToday();
-        int activeMinutes = fitnessDataManager.getActiveMinutesToday();
-
-        tvDistance.setText(String.format(Locale.US, "%.1f km", distanceKm));
-        tvStepCalories.setText(String.valueOf(calories));
-        tvActiveTime.setText(activeMinutes + " min");
-
-        // Motivation text
-        if (progressPercent >= 100) {
-            tvStepMotivation.setText("Goal achieved! You're a champion!");
-        } else if (progressPercent >= 75) {
-            tvStepMotivation.setText("Almost there! " + (goalSteps - currentSteps) + " steps to go!");
-        } else if (progressPercent >= 50) {
-            tvStepMotivation.setText("Halfway there! Keep moving!");
-        } else if (progressPercent >= 25) {
-            tvStepMotivation.setText("Great start! Keep it up!");
-        } else {
-            tvStepMotivation.setText("🌅 Start your day with a walk!");
-        }
-
-        // Set goal button
-        sheetView.findViewById(R.id.btnSetStepGoal).setOnClickListener(v -> {
-            // TODO: Show goal setting dialog
-            bottomSheetDialog.dismiss();
-        });
-
-        // Close button
-        sheetView.findViewById(R.id.btnCloseSteps).setOnClickListener(v -> bottomSheetDialog.dismiss());
-
-        bottomSheetDialog.show();
-    }
-
-    /**
-     * Helper class to hold day item data.
-     */
     private static class DayItem {
         Calendar date;
         String dayLabel;

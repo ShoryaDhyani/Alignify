@@ -1,31 +1,33 @@
 package com.alignify;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.GestureDetector;
-import android.view.MotionEvent;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.fragment.app.Fragment;
 
 import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
-import com.alignify.util.NavigationHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import android.view.View;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -34,9 +36,10 @@ import java.text.NumberFormat;
 import java.util.Locale;
 
 /**
- * Settings screen for configuring goals, units, and profile.
+ * Profile/Settings fragment.
+ * Converted from SettingsActivity for ViewPager2-based navigation.
  */
-public class SettingsActivity extends AppCompatActivity {
+public class ProfileFragment extends Fragment {
 
     private static final String PREFS_NAME = "AlignifyPrefs";
     private static final String KEY_DISTANCE_UNIT = "distance_unit";
@@ -53,8 +56,6 @@ public class SettingsActivity extends AppCompatActivity {
     private SwitchMaterial switchWaterReminders;
     private TextView tvThemeMode;
 
-    // Guard flag to prevent listener re-trigger during programmatic setChecked()
-    // calls
     private boolean isUpdatingUI = false;
 
     // Data
@@ -67,71 +68,68 @@ public class SettingsActivity extends AppCompatActivity {
     private FirebaseAuth firebaseAuth;
     private GoogleSignInClient googleSignInClient;
 
-    // Swipe navigation
-    private GestureDetector swipeDetector;
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_settings_new, container, false);
+    }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_settings_new);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-        // Initialize FitnessDataManager (single source of truth for goals)
-        fitnessDataManager = FitnessDataManager.getInstance(this);
+        // Hide the bottom nav bar from the inflated layout
+        View bottomNav = view.findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.GONE);
+        }
+
+        // Hide the back button (not needed in ViewPager2)
+        View btnBack = view.findViewById(R.id.btnBackSettings);
+        if (btnBack != null) {
+            btnBack.setVisibility(View.GONE);
+        }
+
+        fitnessDataManager = FitnessDataManager.getInstance(requireContext());
 
         firebaseAuth = FirebaseAuth.getInstance();
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .build();
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
+        googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
-        initViews();
+        initViews(view);
         loadSettings();
         loadUserProfile();
-        setupListeners();
-        setupBottomNavigation();
-
-        // Setup swipe navigation
-        swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_PROFILE);
-
-        // Back button
-        View btnBack = findViewById(R.id.btnBackSettings);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
-        }
+        setupListeners(view);
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (swipeDetector != null) {
-            swipeDetector.onTouchEvent(ev);
-        }
-        return super.dispatchTouchEvent(ev);
-    }
-
-    @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
-        // Refresh profile data when returning from EditProfileActivity
+        if (!isAdded())
+            return;
         loadUserProfile();
         loadSettings();
     }
 
-    private void initViews() {
-        tvStepGoal = findViewById(R.id.tvStepGoal);
-        tvCalorieGoal = findViewById(R.id.tvCalorieGoal);
-        tvDistanceUnit = findViewById(R.id.tvDistanceUnit);
-        tvWaterGoal = findViewById(R.id.tvWaterGoal);
-        tvUserName = findViewById(R.id.tvUserName);
-        tvUserEmail = findViewById(R.id.tvUserEmail);
-        ivProfileImage = findViewById(R.id.ivProfileImage);
-        switchWaterReminders = findViewById(R.id.switchWaterReminders);
-        tvThemeMode = findViewById(R.id.tvThemeMode);
+    private void initViews(View view) {
+        tvStepGoal = view.findViewById(R.id.tvStepGoal);
+        tvCalorieGoal = view.findViewById(R.id.tvCalorieGoal);
+        tvDistanceUnit = view.findViewById(R.id.tvDistanceUnit);
+        tvWaterGoal = view.findViewById(R.id.tvWaterGoal);
+        tvUserName = view.findViewById(R.id.tvUserName);
+        tvUserEmail = view.findViewById(R.id.tvUserEmail);
+        ivProfileImage = view.findViewById(R.id.ivProfileImage);
+        switchWaterReminders = view.findViewById(R.id.switchWaterReminders);
+        tvThemeMode = view.findViewById(R.id.tvThemeMode);
 
-        // Set app version dynamically from PackageInfo
-        TextView tvAppVersion = findViewById(R.id.tvAppVersion);
+        TextView tvAppVersion = view.findViewById(R.id.tvAppVersion);
         if (tvAppVersion != null) {
             try {
-                PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                PackageInfo pInfo = requireContext().getPackageManager().getPackageInfo(
+                        requireContext().getPackageName(), 0);
                 tvAppVersion.setText("Alignify v" + pInfo.versionName);
             } catch (PackageManager.NameNotFoundException e) {
                 tvAppVersion.setText("Alignify");
@@ -140,21 +138,19 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void loadSettings() {
-        // Load goals from FitnessDataManager (centralized source of truth)
+        if (!isAdded())
+            return;
         stepGoal = fitnessDataManager.getStepGoal();
         calorieGoal = fitnessDataManager.getCaloriesGoal();
         waterGoal = fitnessDataManager.getWaterGoal();
 
-        // Load other settings from SharedPreferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         useKilometers = prefs.getBoolean(KEY_DISTANCE_UNIT, true);
 
-        // Guard against listener re-trigger during programmatic setChecked()
         isUpdatingUI = true;
         switchWaterReminders.setChecked(prefs.getBoolean(KEY_WATER_REMINDERS, true));
         isUpdatingUI = false;
 
-        // Update theme mode display
         String themeMode = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
         updateThemeModeDisplay(themeMode);
 
@@ -162,21 +158,21 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void loadUserProfile() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (!isAdded())
+            return;
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        // First check for custom display name saved in EditProfileActivity
         String savedDisplayName = prefs.getString("display_name", null);
         String savedPhotoUri = prefs.getString("profile_photo_uri", null);
 
         if (savedDisplayName != null && !savedDisplayName.isEmpty()) {
             tvUserName.setText(savedDisplayName);
         } else {
-            // Fall back to Firebase/Google account
             FirebaseUser user = firebaseAuth.getCurrentUser();
             if (user != null && user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
                 tvUserName.setText(user.getDisplayName());
             } else {
-                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
                 if (account != null && account.getDisplayName() != null) {
                     tvUserName.setText(account.getDisplayName());
                 } else {
@@ -185,18 +181,16 @@ public class SettingsActivity extends AppCompatActivity {
             }
         }
 
-        // Load email
         FirebaseUser user = firebaseAuth.getCurrentUser();
         if (user != null && user.getEmail() != null) {
             tvUserEmail.setText(user.getEmail());
         } else {
-            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
             if (account != null && account.getEmail() != null) {
                 tvUserEmail.setText(account.getEmail());
             }
         }
 
-        // Load profile photo - prefer custom saved photo
         if (savedPhotoUri != null) {
             Glide.with(this)
                     .load(Uri.parse(savedPhotoUri))
@@ -212,7 +206,7 @@ public class SettingsActivity extends AppCompatActivity {
                     .circleCrop()
                     .into(ivProfileImage);
         } else {
-            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
             if (account != null && account.getPhotoUrl() != null) {
                 Glide.with(this)
                         .load(account.getPhotoUrl())
@@ -232,42 +226,41 @@ public class SettingsActivity extends AppCompatActivity {
         tvWaterGoal.setText(waterGoal + " cups");
     }
 
-    private void setupListeners() {
-        findViewById(R.id.cardProfile).setOnClickListener(v -> {
-            Intent intent = new Intent(this, EditProfileActivity.class);
+    private void setupListeners(View view) {
+        view.findViewById(R.id.cardProfile).setOnClickListener(v -> {
+            Intent intent = new Intent(requireContext(), EditProfileActivity.class);
             startActivity(intent);
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
         });
 
-        findViewById(R.id.settingStepGoal).setOnClickListener(v -> showStepGoalDialog());
-        findViewById(R.id.settingCalorieGoal).setOnClickListener(v -> showCalorieGoalDialog());
-        findViewById(R.id.settingWaterGoal).setOnClickListener(v -> showWaterGoalDialog());
-        findViewById(R.id.settingDistanceUnit).setOnClickListener(v -> showDistanceUnitDialog());
-        findViewById(R.id.settingEditProfile).setOnClickListener(v -> {
-            Intent intent = new Intent(this, EditProfileActivity.class);
+        view.findViewById(R.id.settingStepGoal).setOnClickListener(v -> showStepGoalDialog());
+        view.findViewById(R.id.settingCalorieGoal).setOnClickListener(v -> showCalorieGoalDialog());
+        view.findViewById(R.id.settingWaterGoal).setOnClickListener(v -> showWaterGoalDialog());
+        view.findViewById(R.id.settingDistanceUnit).setOnClickListener(v -> showDistanceUnitDialog());
+        view.findViewById(R.id.settingEditProfile).setOnClickListener(v -> {
+            Intent intent = new Intent(requireContext(), EditProfileActivity.class);
             startActivity(intent);
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
         });
-        findViewById(R.id.settingLogout).setOnClickListener(v -> showLogoutConfirmation());
+        view.findViewById(R.id.settingLogout).setOnClickListener(v -> showLogoutConfirmation());
 
         switchWaterReminders.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isUpdatingUI)
                 return;
+            if (!isAdded())
+                return;
 
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putBoolean(KEY_WATER_REMINDERS, isChecked).apply();
 
             if (isChecked) {
-                WaterReminderService.scheduleReminders(this);
-                Toast.makeText(this, "Water reminders enabled", Toast.LENGTH_SHORT).show();
+                WaterReminderService.scheduleReminders(requireContext());
+                Toast.makeText(requireContext(), "Water reminders enabled", Toast.LENGTH_SHORT).show();
             } else {
-                WaterReminderService.cancelReminders(this);
-                Toast.makeText(this, "Water reminders disabled", Toast.LENGTH_SHORT).show();
+                WaterReminderService.cancelReminders(requireContext());
+                Toast.makeText(requireContext(), "Water reminders disabled", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Theme mode selector
-        View settingTheme = findViewById(R.id.settingDarkMode);
+        View settingTheme = view.findViewById(R.id.settingDarkMode);
         if (settingTheme != null) {
             settingTheme.setOnClickListener(v -> showThemeModeDialog());
         }
@@ -290,12 +283,14 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showThemeModeDialog() {
+        if (!isAdded())
+            return;
         final String[] options = { "Light", "Dark", "System Default" };
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String current = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
         int checkedItem = current.equals("dark") ? 1 : current.equals("system") ? 2 : 0;
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Theme")
                 .setSingleChoiceItems(options, checkedItem, (dialog, which) -> {
                     String selected;
@@ -326,20 +321,16 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void setupBottomNavigation() {
-        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_PROFILE,
-                findViewById(R.id.navHome), findViewById(R.id.navExercises),
-                findViewById(R.id.navAnalytics), findViewById(R.id.navProfile));
-    }
-
     private void showStepGoalDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
+        if (!isAdded())
+            return;
+        android.widget.EditText input = new android.widget.EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         input.setHint("Enter daily step goal");
         input.setText(String.valueOf(stepGoal));
         input.setSelection(input.getText().length());
 
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -348,7 +339,7 @@ public class SettingsActivity extends AppCompatActivity {
         input.setLayoutParams(params);
         container.addView(input);
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Daily Step Goal")
                 .setView(container)
                 .setPositiveButton("Save", (dialog, which) -> {
@@ -361,10 +352,11 @@ public class SettingsActivity extends AppCompatActivity {
                                 saveSettings();
                                 updateUI();
                             } else {
-                                Toast.makeText(this, "Enter a value between 1 and 100,000", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(requireContext(), "Enter a value between 1 and 100,000",
+                                        Toast.LENGTH_SHORT).show();
                             }
                         } catch (NumberFormatException e) {
-                            Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "Invalid number", Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
@@ -373,13 +365,15 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showCalorieGoalDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
+        if (!isAdded())
+            return;
+        android.widget.EditText input = new android.widget.EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         input.setHint("Enter daily calorie goal");
         input.setText(String.valueOf(calorieGoal));
         input.setSelection(input.getText().length());
 
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -388,7 +382,7 @@ public class SettingsActivity extends AppCompatActivity {
         input.setLayoutParams(params);
         container.addView(input);
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Daily Calorie Goal")
                 .setView(container)
                 .setPositiveButton("Save", (dialog, which) -> {
@@ -401,10 +395,11 @@ public class SettingsActivity extends AppCompatActivity {
                                 saveSettings();
                                 updateUI();
                             } else {
-                                Toast.makeText(this, "Enter a value between 1 and 10,000", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(requireContext(), "Enter a value between 1 and 10,000",
+                                        Toast.LENGTH_SHORT).show();
                             }
                         } catch (NumberFormatException e) {
-                            Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "Invalid number", Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
@@ -413,13 +408,15 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showWaterGoalDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
+        if (!isAdded())
+            return;
+        android.widget.EditText input = new android.widget.EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         input.setHint("Enter daily water cups goal");
         input.setText(String.valueOf(waterGoal));
         input.setSelection(input.getText().length());
 
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -428,7 +425,7 @@ public class SettingsActivity extends AppCompatActivity {
         input.setLayoutParams(params);
         container.addView(input);
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Daily Water Goal")
                 .setView(container)
                 .setPositiveButton("Save", (dialog, which) -> {
@@ -440,12 +437,12 @@ public class SettingsActivity extends AppCompatActivity {
                                 waterGoal = newGoal;
                                 saveSettings();
                                 updateUI();
-                                // FitnessDataManager is updated in saveSettings()
                             } else {
-                                Toast.makeText(this, "Enter a value between 1 and 20", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(requireContext(), "Enter a value between 1 and 20",
+                                        Toast.LENGTH_SHORT).show();
                             }
                         } catch (NumberFormatException e) {
-                            Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "Invalid number", Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
@@ -454,9 +451,11 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showDistanceUnitDialog() {
+        if (!isAdded())
+            return;
         final String[] units = { "Kilometers (km)", "Miles (mi)" };
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Distance Unit")
                 .setItems(units, (dialog, which) -> {
                     useKilometers = (which == 0);
@@ -467,23 +466,24 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void saveSettings() {
-        // Save goals to FitnessDataManager (syncs to Firestore automatically)
+        if (!isAdded())
+            return;
         fitnessDataManager.setStepGoal(stepGoal);
         fitnessDataManager.setCaloriesGoal(calorieGoal);
         fitnessDataManager.setWaterGoal(waterGoal);
 
-        // Save other settings to SharedPreferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putBoolean(KEY_DISTANCE_UNIT, useKilometers)
                 .apply();
 
-        // Reload CaloriesEngine if profile changed
-        CaloriesEngine.getInstance(this).loadUserProfile();
+        CaloriesEngine.getInstance(requireContext()).loadUserProfile();
     }
 
     private void showLogoutConfirmation() {
-        new AlertDialog.Builder(this)
+        if (!isAdded())
+            return;
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Logout")
                 .setMessage("Are you sure you want to logout?")
                 .setPositiveButton("Logout", (dialog, which) -> performLogout())
@@ -492,20 +492,24 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void performLogout() {
+        if (!isAdded())
+            return;
         if (firebaseAuth != null) {
             firebaseAuth.signOut();
         }
 
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        googleSignInClient.signOut().addOnCompleteListener(requireActivity(), task -> {
+            if (!isAdded())
+                return;
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().clear().apply();
 
-            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
 
-            Intent intent = new Intent(this, LoginActivity.class);
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
-            finish();
+            requireActivity().finish();
         });
     }
 

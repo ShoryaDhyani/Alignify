@@ -1,6 +1,7 @@
 package com.alignify.exercises;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.utils.LandmarkUtils;
@@ -101,13 +102,17 @@ public class BicepCurlDetector extends ExerciseDetector {
 
         // Check for lean back using ML model if available
         if (tfliteInterpreter != null) {
-            float[] features = LandmarkUtils.extractBicepFeatures(result);
-            if (features != null) {
-                int prediction = tfliteInterpreter.predictClass(features);
-                if (prediction == 1) { // Assuming 1 = lean back error
-                    errors.add("Leaning back - keep torso straight");
-                    isCorrect = false;
+            try {
+                float[] features = LandmarkUtils.extractBicepFeatures(result);
+                if (features != null) {
+                    int prediction = tfliteInterpreter.predictClass(features);
+                    if (prediction == 1) { // Assuming 1 = lean back error
+                        errors.add("Leaning back - keep torso straight");
+                        isCorrect = false;
+                    }
                 }
+            } catch (Exception e) {
+                Log.w("BicepCurlDetector", "ML inference failed", e);
             }
         }
 

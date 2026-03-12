@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.SystemClock;
+import android.os.UserManager;
 import android.util.Log;
 
 import com.alignify.service.StepCounterService;
@@ -44,6 +45,13 @@ public class BootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
                 Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action) ||
                 "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
+
+            // Credential-encrypted storage is unavailable before user unlock
+            UserManager userManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
+            if (userManager != null && !userManager.isUserUnlocked()) {
+                Log.d(TAG, "Device not yet unlocked, skipping boot event");
+                return;
+            }
 
             // Deduplicate: only process once per boot cycle
             SharedPreferences prefs = context.getSharedPreferences("AlignifyPrefs", Context.MODE_PRIVATE);

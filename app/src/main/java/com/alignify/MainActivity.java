@@ -5,8 +5,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,6 +51,9 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout navAnalytics;
     private LinearLayout navProfile;
 
+    // Swipe navigation
+    private GestureDetector swipeDetector;
+
     private final ActivityResultLauncher<String> cameraPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
@@ -72,6 +78,40 @@ public class MainActivity extends AppCompatActivity {
         setupExerciseCards();
         setupFeedbackToggles();
         setupBottomNavigation();
+
+        // Setup swipe navigation
+        swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_EXERCISES);
+
+        // Setup overscroll navigation on main ScrollView
+        View contentView = findViewById(android.R.id.content);
+        if (contentView instanceof android.view.ViewGroup) {
+            ScrollView mainScroll = findScrollView((android.view.ViewGroup) contentView);
+            if (mainScroll != null) {
+                NavigationHelper.enableOverscrollNavigation(this, mainScroll, NavigationHelper.NAV_EXERCISES);
+            }
+        }
+    }
+
+    private ScrollView findScrollView(android.view.ViewGroup parent) {
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            View child = parent.getChildAt(i);
+            if (child instanceof ScrollView)
+                return (ScrollView) child;
+            if (child instanceof android.view.ViewGroup) {
+                ScrollView found = findScrollView((android.view.ViewGroup) child);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (swipeDetector != null) {
+            swipeDetector.onTouchEvent(ev);
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     private void initViews() {

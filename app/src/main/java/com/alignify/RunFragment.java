@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
@@ -15,17 +16,19 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
-import android.view.GestureDetector;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.alignify.data.FitnessDataManager;
@@ -59,27 +62,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Strava-style activity for recording Run and Walk sessions.
- * Tracks GPS route on a live map, duration, distance, pace, calories, steps,
- * and avg speed.
- * Saves completed activities to Firestore via UserRepository.saveActivity().
+ * Run/Walk tracking fragment with Mapbox Maps SDK v11.
+ * Converted from RunActivity for ViewPager2-based navigation.
+ * Disables ViewPager2 swiping during active recording.
  */
-public class RunActivity extends AppCompatActivity {
+public class RunFragment extends Fragment {
 
-    private static final String TAG = "RunActivity";
+    private static final String TAG = "RunFragment";
     private static final int LOCATION_PERMISSION_REQUEST = 2001;
     private static final String ROUTE_SOURCE_ID = "route-source";
     private static final String ROUTE_LAYER_ID = "route-layer";
 
-    // Activity types
     private static final int TYPE_RUN = 0;
     private static final int TYPE_WALK = 1;
 
-    // Calories per step
     private static final float RUN_CAL_PER_STEP = 0.06f;
     private static final float WALK_CAL_PER_STEP = 0.04f;
 
-    // Timer states
     private static final int STATE_IDLE = 0;
     private static final int STATE_RUNNING = 1;
     private static final int STATE_PAUSED = 2;
@@ -102,7 +101,6 @@ public class RunActivity extends AppCompatActivity {
     private int activityType = TYPE_RUN;
     private int timerState = STATE_IDLE;
     private boolean isLocked = false;
-    private boolean isMapTouched = false;
 
     // Timer
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
@@ -117,11 +115,8 @@ public class RunActivity extends AppCompatActivity {
     private int stepsAtStart = 0;
     private int sessionSteps = 0;
 
-    // Session timestamps for Firestore save
+    // Session timestamps
     private long sessionStartTime = 0;
-
-    // Swipe navigation
-    private GestureDetector swipeDetector;
 
     // Step broadcast receiver
     private final BroadcastReceiver stepReceiver = new BroadcastReceiver() {
@@ -149,59 +144,89 @@ public class RunActivity extends AppCompatActivity {
         }
     };
 
+    @Nullable
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_run);
-
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        initLocationListener();
-        initViews();
-        setupMap();
-        setupTabs();
-        setupControls();
-        setupNavigation();
-        ensureStepService();
-        requestLocationPermission();
-
-        // Setup swipe navigation
-        swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_RUN);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_run, container, false);
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        // Only allow swipe navigation when not recording and not touching the map
-        if (swipeDetector != null && timerState == STATE_IDLE && !isMapTouched) {
-            swipeDetector.onTouchEvent(ev);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Hide the bottom nav bar from the inflated layout
+        View bottomNav = view.findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.GONE);
         }
-        return super.dispatchTouchEvent(ev);
+
+        // Hide the back button (not needed in ViewPager2)
+        View btnBack = view.findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setVisibility(View.GONE);
+        }
+
+        locationManager = (LocationManager) requireContext().getSystemService(Context.LOCATION_SERVICE);
+        initLocationListener();
+        initViews(view);
+        setupMap(view);
+        setupTabs();
+        setupControls();
+        ensureStepService();
+        requestLocationPermission();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (!isAdded())
+            return;
+        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
+                stepReceiver, new IntentFilter(StepCounterService.ACTION_STEP_UPDATE));
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isAdded()) {
+            LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(stepReceiver);
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        timerHandler.removeCallbacks(timerRunnable);
+        stopLocationUpdates();
+        if (getActivity() != null) {
+            getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     // ============ Init ============
 
-    private void initViews() {
-        tvHeaderTitle = findViewById(R.id.tvHeaderTitle);
-        tvRunStatus = findViewById(R.id.tvRunStatus);
-        tvRunTimer = findViewById(R.id.tvRunTimer);
-        tvRunDistance = findViewById(R.id.tvRunDistance);
-        tvRunPace = findViewById(R.id.tvRunPace);
-        tvRunCalories = findViewById(R.id.tvRunCalories);
-        tvRunSteps = findViewById(R.id.tvRunSteps);
-        tvRunAvgSpeed = findViewById(R.id.tvRunAvgSpeed);
-        tvRunHint = findViewById(R.id.tvRunHint);
+    private void initViews(View view) {
+        tvHeaderTitle = view.findViewById(R.id.tvHeaderTitle);
+        tvRunStatus = view.findViewById(R.id.tvRunStatus);
+        tvRunTimer = view.findViewById(R.id.tvRunTimer);
+        tvRunDistance = view.findViewById(R.id.tvRunDistance);
+        tvRunPace = view.findViewById(R.id.tvRunPace);
+        tvRunCalories = view.findViewById(R.id.tvRunCalories);
+        tvRunSteps = view.findViewById(R.id.tvRunSteps);
+        tvRunAvgSpeed = view.findViewById(R.id.tvRunAvgSpeed);
+        tvRunHint = view.findViewById(R.id.tvRunHint);
 
-        tabRun = findViewById(R.id.tabRun);
-        tabWalk = findViewById(R.id.tabWalk);
+        tabRun = view.findViewById(R.id.tabRun);
+        tabWalk = view.findViewById(R.id.tabWalk);
 
-        btnStartPause = findViewById(R.id.btnRunStartPause);
-        btnStop = findViewById(R.id.btnRunStop);
-        btnLock = findViewById(R.id.btnRunLock);
-
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        btnStartPause = view.findViewById(R.id.btnRunStartPause);
+        btnStop = view.findViewById(R.id.btnRunStop);
+        btnLock = view.findViewById(R.id.btnRunLock);
     }
 
-    private void setupMap() {
-        mapView = findViewById(R.id.mapView);
+    private void setupMap(View view) {
+        mapView = view.findViewById(R.id.mapView);
         if (mapView == null) {
             Log.e(TAG, "MapView not found in layout!");
             return;
@@ -211,20 +236,19 @@ public class RunActivity extends AppCompatActivity {
             mapStyleLoaded = true;
             Log.d(TAG, "Mapbox style loaded");
 
+            // Enable location puck (blue dot)
             if (hasLocationPermission()) {
                 enableLocationPuck();
                 zoomToCurrentLocation();
             }
         });
 
-        // Feature 3: Intercept touch on MapView to prevent swipe navigation
+        // Feature 3: Intercept touch on MapView to prevent ViewPager2 swipe
         mapView.setOnTouchListener((v, event) -> {
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-                isMapTouched = true;
                 v.getParent().requestDisallowInterceptTouchEvent(true);
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                isMapTouched = false;
                 v.getParent().requestDisallowInterceptTouchEvent(false);
             }
             return false; // Don't consume — let MapView handle its own gestures
@@ -284,13 +308,13 @@ public class RunActivity extends AppCompatActivity {
     // ============ Location Permission ============
 
     private boolean hasLocationPermission() {
-        return ContextCompat.checkSelfPermission(this,
+        return isAdded() && ContextCompat.checkSelfPermission(requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestLocationPermission() {
-        if (!hasLocationPermission()) {
-            ActivityCompat.requestPermissions(this,
+        if (!hasLocationPermission() && isAdded()) {
+            ActivityCompat.requestPermissions(requireActivity(),
                     new String[] { Manifest.permission.ACCESS_FINE_LOCATION },
                     LOCATION_PERMISSION_REQUEST);
         }
@@ -306,8 +330,8 @@ public class RunActivity extends AppCompatActivity {
                     enableLocationPuck();
                     zoomToCurrentLocation();
                 }
-            } else {
-                Toast.makeText(this, "Location permission needed for route tracking",
+            } else if (isAdded()) {
+                Toast.makeText(requireContext(), "Location permission needed for route tracking",
                         Toast.LENGTH_SHORT).show();
             }
         }
@@ -476,9 +500,9 @@ public class RunActivity extends AppCompatActivity {
         boolean isRun = (type == TYPE_RUN);
 
         tabRun.setBackgroundResource(isRun ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
-        tabRun.setTextColor(getColor(isRun ? android.R.color.white : R.color.text_secondary_dark));
+        tabRun.setTextColor(requireContext().getColor(isRun ? android.R.color.white : R.color.text_secondary_dark));
         tabWalk.setBackgroundResource(isRun ? R.drawable.bg_tab_unselected : R.drawable.bg_tab_selected);
-        tabWalk.setTextColor(getColor(isRun ? R.color.text_secondary_dark : android.R.color.white));
+        tabWalk.setTextColor(requireContext().getColor(isRun ? R.color.text_secondary_dark : android.R.color.white));
 
         tvHeaderTitle.setText(isRun ? "Running" : "Walking");
         tvRunHint.setText(isRun ? "Tap Start to begin your run" : "Tap Start to begin your walk");
@@ -513,7 +537,9 @@ public class RunActivity extends AppCompatActivity {
     // ============ Session Lifecycle ============
 
     private void startSession() {
-        stepsAtStart = StepCounterService.getStepsToday(this);
+        if (!isAdded())
+            return;
+        stepsAtStart = StepCounterService.getStepsToday(requireContext());
         sessionSteps = 0;
         elapsedMs = 0;
         gpsDistanceMetres = 0f;
@@ -524,14 +550,16 @@ public class RunActivity extends AppCompatActivity {
         sessionStartTime = System.currentTimeMillis();
         timerStartMs = SystemClock.elapsedRealtime();
         timerState = STATE_RUNNING;
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        requireActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         startLocationUpdates();
         timerHandler.post(timerRunnable);
         updateUI();
 
-        // Hide nav bar during recording
-        NavigationHelper.hideNavBar(this);
+        // Disable ViewPager2 swiping during recording
+        if (getActivity() instanceof HomeActivity) {
+            ((HomeActivity) getActivity()).setSwipeEnabled(false);
+        }
     }
 
     private void pauseSession() {
@@ -539,40 +567,44 @@ public class RunActivity extends AppCompatActivity {
         timerState = STATE_PAUSED;
         timerHandler.removeCallbacks(timerRunnable);
         stopLocationUpdates();
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (getActivity() != null) {
+            getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
         updateUI();
     }
 
     private void resumeSession() {
+        if (!isAdded())
+            return;
         timerStartMs = SystemClock.elapsedRealtime() - elapsedMs;
         timerState = STATE_RUNNING;
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        lastLocation = null; // don't count gap distance
+        requireActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        lastLocation = null;
         startLocationUpdates();
         timerHandler.post(timerRunnable);
         updateUI();
     }
 
     private void stopAndSave() {
+        if (!isAdded())
+            return;
         if (timerState == STATE_RUNNING) {
             elapsedMs = SystemClock.elapsedRealtime() - timerStartMs;
         }
         timerHandler.removeCallbacks(timerRunnable);
         stopLocationUpdates();
         timerState = STATE_IDLE;
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        requireActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         int durationSec = (int) (elapsedMs / 1000);
         float distanceKm = gpsDistanceMetres / 1000f;
         int calories = calculateCalories();
         long endTime = System.currentTimeMillis();
 
-        // Save to FitnessDataManager (daily totals)
         if (durationSec > 0) {
-            FitnessDataManager.getInstance(this).recordWorkout(durationSec, calories);
+            FitnessDataManager.getInstance(requireContext()).recordWorkout(durationSec, calories);
         }
 
-        // Save activity to Firestore
         String type = activityType == TYPE_RUN ? "run" : "walk";
         UserRepository.getInstance().saveActivity(
                 type, "manual", sessionStartTime, endTime,
@@ -589,15 +621,15 @@ public class RunActivity extends AppCompatActivity {
                     }
                 });
 
-        // Fit entire route on map
         fitRouteOnMap();
-
         tvRunStatus.setText("Saved!");
         tvRunHint.setText(formatSummary());
         updateUI();
 
-        // Show nav bar after recording ends
-        NavigationHelper.showNavBar(this);
+        // Re-enable ViewPager2 swiping after recording ends
+        if (getActivity() instanceof HomeActivity) {
+            ((HomeActivity) getActivity()).setSwipeEnabled(true);
+        }
 
         timerHandler.postDelayed(this::resetSession, 4000);
     }
@@ -628,8 +660,7 @@ public class RunActivity extends AppCompatActivity {
             case STATE_IDLE:
                 tvRunStatus.setText("Ready");
                 btnStartPause.setImageResource(R.drawable.ic_play);
-                btnStartPause.setBackgroundTintList(
-                        android.content.res.ColorStateList.valueOf(0xFF4CAF50));
+                btnStartPause.setBackgroundTintList(ColorStateList.valueOf(0xFF4CAF50));
                 btnStop.setVisibility(View.GONE);
                 btnLock.setVisibility(View.GONE);
                 tabRun.setAlpha(1.0f);
@@ -639,8 +670,7 @@ public class RunActivity extends AppCompatActivity {
             case STATE_RUNNING:
                 tvRunStatus.setText(activityType == TYPE_RUN ? "Running..." : "Walking...");
                 btnStartPause.setImageResource(R.drawable.ic_pause);
-                btnStartPause.setBackgroundTintList(
-                        android.content.res.ColorStateList.valueOf(0xFFFFA000));
+                btnStartPause.setBackgroundTintList(ColorStateList.valueOf(0xFFFFA000));
                 btnStop.setVisibility(View.VISIBLE);
                 btnLock.setVisibility(View.VISIBLE);
                 tabRun.setAlpha(0.5f);
@@ -650,8 +680,7 @@ public class RunActivity extends AppCompatActivity {
             case STATE_PAUSED:
                 tvRunStatus.setText("Paused");
                 btnStartPause.setImageResource(R.drawable.ic_play);
-                btnStartPause.setBackgroundTintList(
-                        android.content.res.ColorStateList.valueOf(0xFF4CAF50));
+                btnStartPause.setBackgroundTintList(ColorStateList.valueOf(0xFF4CAF50));
                 btnStop.setVisibility(View.VISIBLE);
                 btnLock.setVisibility(View.GONE);
                 tabRun.setAlpha(0.5f);
@@ -669,7 +698,6 @@ public class RunActivity extends AppCompatActivity {
     }
 
     private void updateStats() {
-        // Use GPS distance (accurate) instead of step-based estimation
         float distanceKm = gpsDistanceMetres / 1000f;
         int calories = calculateCalories();
         float elapsedHours = elapsedMs / 3_600_000f;
@@ -690,11 +718,16 @@ public class RunActivity extends AppCompatActivity {
 
     private void updateStatsDisplay(float distanceKm, int steps, int calories,
             float avgSpeedKmh, String paceStr) {
-        tvRunDistance.setText(String.format("%.2f km", distanceKm));
-        tvRunSteps.setText(steps + " steps");
-        tvRunCalories.setText(calories + " cal");
-        tvRunAvgSpeed.setText(String.format("%.1f km/h", avgSpeedKmh));
-        tvRunPace.setText(paceStr);
+        if (tvRunDistance != null)
+            tvRunDistance.setText(String.format("%.2f km", distanceKm));
+        if (tvRunSteps != null)
+            tvRunSteps.setText(steps + " steps");
+        if (tvRunCalories != null)
+            tvRunCalories.setText(calories + " cal");
+        if (tvRunAvgSpeed != null)
+            tvRunAvgSpeed.setText(String.format("%.1f km/h", avgSpeedKmh));
+        if (tvRunPace != null)
+            tvRunPace.setText(paceStr);
     }
 
     private int calculateCalories() {
@@ -717,54 +750,26 @@ public class RunActivity extends AppCompatActivity {
     private void toggleLock() {
         isLocked = !isLocked;
         if (isLocked) {
-            btnLock.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(0xFFF44336));
+            btnLock.setBackgroundTintList(ColorStateList.valueOf(0xFFF44336));
             tvRunHint.setText("Screen locked — tap lock to unlock");
             btnStartPause.setAlpha(0.3f);
             btnStop.setAlpha(0.3f);
         } else {
-            btnLock.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(0xFF757575));
+            btnLock.setBackgroundTintList(ColorStateList.valueOf(0xFF757575));
             tvRunHint.setText("");
             btnStartPause.setAlpha(1.0f);
             btnStop.setAlpha(1.0f);
         }
     }
 
-    // ============ Navigation & Lifecycle ============
-
-    private void setupNavigation() {
-        NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_RUN,
-                findViewById(R.id.navHome), findViewById(R.id.navExercises),
-                findViewById(R.id.navRun), findViewById(R.id.navAnalytics),
-                findViewById(R.id.navProfile));
-    }
+    // ============ Step Service ============
 
     private void ensureStepService() {
-        if (StepCounterHelper.hasAllPermissions(this)
-                && StepCounterHelper.isStepCounterAvailable(this)) {
-            StepCounterHelper.startStepTracking(this, false);
+        if (!isAdded())
+            return;
+        if (StepCounterHelper.hasAllPermissions(requireContext())
+                && StepCounterHelper.isStepCounterAvailable(requireContext())) {
+            StepCounterHelper.startStepTracking(requireContext(), false);
         }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(
-                stepReceiver, new IntentFilter(StepCounterService.ACTION_STEP_UPDATE));
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(stepReceiver);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        timerHandler.removeCallbacks(timerRunnable);
-        stopLocationUpdates();
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 }

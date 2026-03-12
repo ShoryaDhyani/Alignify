@@ -56,10 +56,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.MediaPose">
         
-        <!-- Google Maps API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
+
 
         <!-- Preloaded Google Fonts for offline use -->
         <meta-data
@@ -98,6 +95,12 @@
         <!-- Dashboard -->
         <activity
             android:name=".DashboardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        
+        <!-- Home (ViewPager2 host for all main screens) -->
+        <activity
+            android:name=".HomeActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         

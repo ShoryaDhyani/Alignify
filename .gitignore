@@ -29,6 +29,12 @@ secrets.properties
 api_keys.xml
 credentials.json
 **/credentials.json
+mapbox_access_token.xml
+**/mapbox_access_token.xml
+
+# Project-specific non-essential files
+prompt.md
+error.md
 
 # Environment files
 .env
@@ -76,3 +82,5 @@ sdk.dir
 # Sensitive data
 app/src/main/res/values/secrets.xml
 **/api_key*.xml
+.github/agents
+.github/skills

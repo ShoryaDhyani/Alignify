@@ -1,6 +1,7 @@
 package com.alignify.exercises;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 import com.alignify.utils.LandmarkUtils;
@@ -54,10 +55,12 @@ public class PlankDetector extends ExerciseDetector {
                 isHolding = false;
             }
 
+            _repCount = (int) (totalHoldTime / 1000);
+
             return new DetectionResult(
                     true,
                     "Get into plank position",
-                    (int) (totalHoldTime / 1000),
+                    getRepCount(),
                     "rest");
         }
 
@@ -68,6 +71,7 @@ public class PlankDetector extends ExerciseDetector {
         }
 
         long currentHoldTime = (System.currentTimeMillis() - holdStartTime + totalHoldTime) / 1000;
+        _repCount = (int) currentHoldTime;
 
         // Check hip alignment
         String hipError = checkHipAlignment(result);
@@ -85,23 +89,27 @@ public class PlankDetector extends ExerciseDetector {
 
         // Use ML model if available
         if (tfliteInterpreter != null) {
-            float[] features = LandmarkUtils.extractPlankFeatures(result);
-            if (features != null) {
-                int prediction = tfliteInterpreter.predictClass(features);
-                switch (prediction) {
-                    case 1:
-                        if (!errors.contains("Lower your hips")) {
-                            errors.add("Adjust form");
-                        }
-                        isCorrect = false;
-                        break;
-                    case 2:
-                        if (!errors.contains("Raise your hips")) {
-                            errors.add("Adjust form");
-                        }
-                        isCorrect = false;
-                        break;
+            try {
+                float[] features = LandmarkUtils.extractPlankFeatures(result);
+                if (features != null) {
+                    int prediction = tfliteInterpreter.predictClass(features);
+                    switch (prediction) {
+                        case 1:
+                            if (!errors.contains("Lower your hips")) {
+                                errors.add("Adjust form");
+                            }
+                            isCorrect = false;
+                            break;
+                        case 2:
+                            if (!errors.contains("Raise your hips")) {
+                                errors.add("Adjust form");
+                            }
+                            isCorrect = false;
+                            break;
+                    }
                 }
+            } catch (Exception e) {
+                Log.w("PlankDetector", "ML inference failed", e);
             }
         }
 
@@ -115,7 +123,7 @@ public class PlankDetector extends ExerciseDetector {
         return new DetectionResult(
                 isCorrect,
                 feedback,
-                (int) currentHoldTime,
+                getRepCount(),
                 "holding",
                 errors);
     }
