@@ -17,8 +17,9 @@ public class AlignifyApp extends Application {
     public void onCreate() {
         super.onCreate();
 
-        // Initialize Mapbox access token
-        String mapboxToken = getString(R.string.mapbox_access_token);
+        // Initialize Mapbox access token from BuildConfig (set via local.properties or
+        // CI env var)
+        String mapboxToken = BuildConfig.MAPBOX_ACCESS_TOKEN;
         if (mapboxToken != null && !mapboxToken.isEmpty()
                 && !mapboxToken.equals("YOUR_MAPBOX_ACCESS_TOKEN")) {
             MapboxOptions.setAccessToken(mapboxToken);

@@ -6,12 +6,13 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// Read Maps API key from local.properties
+// Read keys from local.properties (local builds) with env var fallback (CI)
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
+fun getProp(key: String) = System.getenv(key) ?: localProperties.getProperty(key, "")
 
 android {
 
@@ -25,7 +26,7 @@ android {
         versionCode = 1
         versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"${getProp("MAPBOX_ACCESS_TOKEN")}\"")
     }
 
     signingConfigs {
@@ -61,6 +62,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     androidResources {

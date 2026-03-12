@@ -45,7 +45,8 @@ public class SignupActivity extends AppCompatActivity {
     private static final String KEY_PROFILE_COMPLETE = "profile_complete";
 
     // Google OAuth Web Client ID
-    // Google OAuth Web Client ID — loaded from R.string.default_web_client_id (auto-generated from google-services.json)
+    // Google OAuth Web Client ID — loaded from R.string.default_web_client_id
+    // (auto-generated from google-services.json)
 
     private EditText nameInput;
     private EditText emailInput;
