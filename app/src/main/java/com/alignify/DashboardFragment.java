@@ -463,6 +463,9 @@ public class DashboardFragment extends Fragment {
         tvCalories = view.findViewById(R.id.tvCalories);
         tvDistance = view.findViewById(R.id.tvDistance);
 
+        fitnessDataManager.getStepsLiveData().observe(getViewLifecycleOwner(), steps -> {
+            updateStepUI(steps);
+        });
         fitnessDataManager.getCaloriesLiveData().observe(getViewLifecycleOwner(), calories -> {
             if (tvCalories != null) {
                 tvCalories.setText(String.valueOf(calories));

@@ -84,3 +84,13 @@ app/src/main/res/values/secrets.xml
 **/api_key*.xml
 .github/agents
 .github/skills
+docs
+scripts
+adapters
+.gsd
+.gemini
+
+# GSD Session Files
+.gsd/STATE.md
+.gsd/JOURNAL.md
+.gsd/TODO.md

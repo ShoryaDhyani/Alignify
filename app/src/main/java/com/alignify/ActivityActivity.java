@@ -94,6 +94,27 @@ public class ActivityActivity extends AppCompatActivity {
         loadData();
         scheduleWaterReminders();
 
+        // Observe FitnessDataManager LiveData for real-time sensor updates
+        fitnessDataManager.getStepsLiveData().observe(this, steps -> {
+            if (tvSteps != null) {
+                int stepGoal = fitnessDataManager.getStepGoal();
+                tvSteps.setText(steps + "/" + stepGoal);
+            }
+        });
+        fitnessDataManager.getCaloriesLiveData().observe(this, calories -> {
+            if (tvCalories != null) {
+                tvCalories.setText(calories + " Cal");
+            }
+        });
+        fitnessDataManager.getActiveMinutesLiveData().observe(this, activeMinutes -> {
+            if (tvTrainingPercent != null && progressTraining != null) {
+                int trainingGoal = fitnessDataManager.getActiveTimeGoal();
+                int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
+                tvTrainingPercent.setText(trainingPercent + "%");
+                progressTraining.setProgress(trainingPercent);
+            }
+        });
+
         // Setup swipe navigation
         swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_ANALYTICS);
     }

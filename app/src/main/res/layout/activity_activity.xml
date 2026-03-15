@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_light"
-    android:clipChildren="false"
-    android:clipToPadding="false"
-    android:orientation="vertical">
+    android:fitsSystemWindows="true"
+    android:background="@color/background_light">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/bottomNavContainer"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
     <!-- Header -->
 
@@ -88,19 +98,13 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:fillViewport="true"
-        android:paddingBottom="80dp">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp"
+            android:paddingTop="8dp">
 
             <!-- Row 1: Calories + Cycling/Map Card -->
             <LinearLayout
@@ -627,13 +631,15 @@
 
         </LinearLayout>
 
-    </ScrollView>
+    </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
 
     <include
+        android:id="@+id/bottomNavContainer"
         layout="@layout/layout_bottom_navbar"
         android:layout_width="match_parent"
-        android:layout_height="80dp" />
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true" />
 
-    <!-- Bottom Navigation Bar -->
-
-</LinearLayout>
+</RelativeLayout>

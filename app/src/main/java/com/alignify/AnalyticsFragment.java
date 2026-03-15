@@ -93,6 +93,35 @@ public class AnalyticsFragment extends Fragment {
         setupWeekCalendar();
         loadData();
         scheduleWaterReminders();
+
+        // Observe FitnessDataManager LiveData for real-time sensor updates
+        fitnessDataManager.getStepsLiveData().observe(getViewLifecycleOwner(), steps -> {
+            if (tvSteps != null) {
+                int stepGoal = fitnessDataManager.getStepGoal();
+                tvSteps.setText(steps + "/" + stepGoal);
+            }
+        });
+        fitnessDataManager.getCaloriesLiveData().observe(getViewLifecycleOwner(), calories -> {
+            if (tvCalories != null) {
+                tvCalories.setText(calories + " Cal");
+            }
+        });
+        fitnessDataManager.getActiveMinutesLiveData().observe(getViewLifecycleOwner(), activeMinutes -> {
+            if (tvTrainingPercent != null && progressTraining != null) {
+                int trainingGoal = fitnessDataManager.getActiveTimeGoal();
+                int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
+                tvTrainingPercent.setText(trainingPercent + "%");
+                progressTraining.setProgress(trainingPercent);
+            }
+        });
+        fitnessDataManager.getWaterCupsLiveData().observe(getViewLifecycleOwner(), cups -> {
+            if (tvWaterCups != null && progressWater != null) {
+                int waterGoal = fitnessDataManager.getWaterGoal();
+                int progress = fitnessDataManager.getWaterProgressPercent();
+                tvWaterCups.setText(cups + "/" + waterGoal + " Cups");
+                progressWater.setProgress(progress);
+            }
+        });
     }
 
     @Override

@@ -21,6 +21,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.alignify.HomeActivity;
 import com.alignify.R;
+import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
 import com.alignify.engine.CaloriesEngine;
 
@@ -199,6 +200,9 @@ public class StepCounterService extends Service implements SensorEventListener {
         editor.putInt(KEY_LAST_KNOWN_STEPS, totalStepsSinceReboot);
         editor.putInt(KEY_STEPS_TODAY, stepsToday);
         editor.apply();
+
+        // Bridge to FitnessDataManager so LiveData observers receive real-time updates
+        FitnessDataManager.getInstance(this).setStepsToday(stepsToday);
 
         Log.d(TAG, "Steps today: " + stepsToday);
 
