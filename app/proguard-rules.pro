@@ -5,4 +5,4 @@
 -keep class com.google.mediapipe.** { *; }
 
 # Keep exercise detector classes
--keep class com.medipose.exercises.** { *; }
+-keep class com.alignify.exercises.** { *; }

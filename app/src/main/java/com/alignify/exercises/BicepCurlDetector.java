@@ -52,6 +52,7 @@ public class BicepCurlDetector extends ExerciseDetector {
         if (leftElbowAngle == null && rightElbowAngle == null) {
             return new DetectionResult(
                     true,
+                    1.0f,
                     "Position yourself in frame",
                     getRepCount(),
                     currentStage);
@@ -101,11 +102,13 @@ public class BicepCurlDetector extends ExerciseDetector {
         }
 
         // Check for lean back using ML model if available
+        float confidence = 1.0f;
         if (tfliteInterpreter != null) {
             try {
                 float[] features = LandmarkUtils.extractBicepFeatures(result);
                 if (features != null) {
                     int prediction = tfliteInterpreter.predictClass(features);
+                    confidence = tfliteInterpreter.predictConfidence(features);
                     if (prediction == 1) { // Assuming 1 = lean back error
                         errors.add("Leaning back - keep torso straight");
                         isCorrect = false;
@@ -127,6 +130,7 @@ public class BicepCurlDetector extends ExerciseDetector {
 
         return new DetectionResult(
                 isCorrect,
+                confidence,
                 feedback,
                 getRepCount(),
                 currentStage,

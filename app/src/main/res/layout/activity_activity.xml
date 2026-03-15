@@ -355,50 +355,88 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <!-- Sleep Card -->
-                <LinearLayout
+                android:orientation="horizontal">                <!-- Premium Sleep Card (Stitch Generated) -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_card_light_pink"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    app:cardBackgroundColor="#1E2336"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="4dp"
+                    app:strokeColor="#2E344E"
+                    app:strokeWidth="1dp">
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:padding="16dp">
 
                         <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_sleep" />
+                            android:id="@+id/ivSleepIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_sleep"
+                            app:tint="#8B95C9"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
 
                         <TextView
+                            android:id="@+id/tvSleepLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="Sleep"
-                            android:textColor="@color/text_primary_dark"
-                            android:textSize="14sp" />
+                            android:textColor="#AAB4E0"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            app:layout_constraintBottom_toBottomOf="@id/ivSleepIcon"
+                            app:layout_constraintStart_toEndOf="@id/ivSleepIcon"
+                            app:layout_constraintTop_toTopOf="@id/ivSleepIcon" />
 
-                    </LinearLayout>
+                        <TextView
+                            android:id="@+id/tvSleep"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="-- hrs"
+                            android:textColor="#FFFFFF"
+                            android:textSize="22sp"
+                            android:textStyle="bold"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/ivSleepIcon" />
 
-                    <TextView
-                        android:id="@+id/tvSleep"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="7.5 hrs"
-                        android:textColor="@color/text_primary_dark"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tvSleep">
 
-                </LinearLayout>
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/progressQuality"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:progress="0"
+                                app:indicatorColor="#6C63FF"
+                                app:indicatorSize="16dp"
+                                app:trackColor="#2E344E"
+                                app:trackThickness="3dp" />
+
+                            <TextView
+                                android:id="@+id/tvSleepQuality"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Quality --%"
+                                android:textColor="#AAB4E0"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <!-- Water Card -->
                 <LinearLayout

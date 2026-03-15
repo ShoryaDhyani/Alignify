@@ -58,6 +58,7 @@ public class LungeDetector extends ExerciseDetector {
         if (kneeAngle == null) {
             return new DetectionResult(
                     true,
+                    1.0f,
                     "Position yourself sideways",
                     getRepCount(),
                     currentStage);
@@ -87,11 +88,13 @@ public class LungeDetector extends ExerciseDetector {
         }
 
         // Use ML model if available for additional error detection
+        float confidence = 1.0f;
         if (tfliteInterpreter != null) {
             try {
                 float[] features = LandmarkUtils.extractLungeFeatures(result);
                 if (features != null) {
                     int prediction = tfliteInterpreter.predictClass(features);
+                    confidence = tfliteInterpreter.predictConfidence(features);
                     if (prediction == 1) {
                         errors.add("Torso leaning - keep upright");
                         isCorrect = false;
@@ -116,6 +119,7 @@ public class LungeDetector extends ExerciseDetector {
 
         return new DetectionResult(
                 isCorrect,
+                confidence,
                 feedback,
                 getRepCount(),
                 currentStage,

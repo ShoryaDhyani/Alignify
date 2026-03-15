@@ -7,11 +7,15 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.alignify.data.sleep.AppDatabase;
+import com.alignify.data.sleep.SleepSession;
+import com.alignify.data.sleep.SleepSessionDao;
 import com.alignify.engine.CaloriesEngine;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.Executors;
 
 /**
  * Centralized singleton manager for all fitness data.
@@ -87,6 +91,11 @@ public class FitnessDataManager {
     private final MutableLiveData<Integer> waterCupsLiveData = new MutableLiveData<>(0);
     private final MutableLiveData<Integer> activeMinutesLiveData = new MutableLiveData<>(0);
     private final MutableLiveData<Float> distanceLiveData = new MutableLiveData<>(0f);
+    private final MutableLiveData<SleepSession> lastSleepLiveData = new MutableLiveData<>();
+    
+    // Wearable specific LiveData
+    private final MutableLiveData<Integer> latestHeartRateLiveData = new MutableLiveData<>(0);
+    private final MutableLiveData<Float> latestSpO2LiveData = new MutableLiveData<>(0f);
 
     // Sync state
     private boolean isSyncing = false;
@@ -112,6 +121,50 @@ public class FitnessDataManager {
         this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         checkAndResetForNewDay();
         loadInitialData();
+        loadLastSleepFromDb();
+        
+        // Auto-sync with wearables on init if available
+        syncWithWearable();
+    }
+
+    // ============ Sleep Session LiveData ============
+
+    /**
+     * Get LiveData for the most recent sleep session.
+     * Observed by UI screens for real-time sleep data updates.
+     */
+    public LiveData<SleepSession> getLastSleepLiveData() {
+        return lastSleepLiveData;
+    }
+
+    /**
+     * Set the latest sleep session. Called by SleepTrackingService when a session completes.
+     * Updates both the LiveData stream and SharedPreferences for backward compatibility.
+     */
+    public void setLastSleepSession(SleepSession session) {
+        lastSleepLiveData.postValue(session);
+        // Also update simple sleep_hours in SharedPreferences for backward compat
+        float hours = session.durationMinutes / 60f;
+        prefs.edit().putFloat(KEY_SLEEP_HOURS, hours).apply();
+    }
+
+    /**
+     * Load today's sleep session from Room DB on background thread.
+     * Called during initialization to populate LiveData from persisted data.
+     */
+    private void loadLastSleepFromDb() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                SleepSessionDao dao = AppDatabase.getInstance(context).sleepSessionDao();
+                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+                SleepSession session = dao.getByDate(today);
+                if (session != null) {
+                    lastSleepLiveData.postValue(session);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading sleep session from DB", e);
+            }
+        });
     }
 
     /**
@@ -808,4 +861,47 @@ public class FitnessDataManager {
     public interface OnDataLoadedListener {
         void onDataLoaded();
     }
+
+    // ============ Wearables Sync ============
+
+    /**
+     * Sycs data from WearableDataManager.
+     * Uses a higher-value-wins strategy for steps and calories to ensure
+     * wearable data overrides phone sensor data if the wearable tracked more.
+     * Triggers a Kotlin coroutine safely in the background.
+     */
+    public void syncWithWearable() {
+        if (WearableDataManager.isHealthConnectAvailable(context)) {
+            WearableDataManager.getInstance(context).syncWithFitnessDataManager(this);
+        }
+    }
+    
+    /**
+     * Sets the latest heart rate from wearable.
+     */
+    public void setLatestHeartRate(int heartRate) {
+        latestHeartRateLiveData.postValue(heartRate);
+    }
+
+    /**
+     * Get LiveData for latest heart rate to observe in UI.
+     */
+    public LiveData<Integer> getLatestHeartRateLiveData() {
+        return latestHeartRateLiveData;
+    }
+
+    /**
+     * Sets the latest SpO2 from wearable.
+     */
+    public void setLatestSpO2(float spo2) {
+        latestSpO2LiveData.postValue(spo2);
+    }
+
+    /**
+     * Get LiveData for latest SpO2 to observe in UI.
+     */
+    public LiveData<Float> getLatestSpO2LiveData() {
+        return latestSpO2LiveData;
+    }
+
 }

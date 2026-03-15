@@ -14,10 +14,12 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
+import com.alignify.data.sleep.SleepSession;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.WaterTrackingHelper;
 import com.github.mikephil.charting.charts.BarChart;
@@ -31,6 +33,7 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -53,8 +56,13 @@ public class AnalyticsFragment extends Fragment {
     private TextView tvTrainingPercent;
     private ProgressBar progressTraining;
     private TextView tvHeartRate;
+    private TextView tvActiveMinutes;
     private TextView tvSteps;
     private TextView tvSleep;
+    private TextView tvSleepQuality;
+    private CircularProgressIndicator progressQuality;
+
+    // Water tracking UI
     private TextView tvWaterCups;
     private ProgressBar progressWater;
     private ImageButton btnAddWater;
@@ -114,12 +122,35 @@ public class AnalyticsFragment extends Fragment {
                 progressTraining.setProgress(trainingPercent);
             }
         });
+        fitnessDataManager.getActiveMinutesLiveData().observe(getViewLifecycleOwner(), activeMinutes -> {
+            if (tvActiveMinutes != null) {
+                tvActiveMinutes.setText(activeMinutes + " min");
+            }
+        });
+
+        fitnessDataManager.getLastSleepLiveData().observe(getViewLifecycleOwner(), session -> {
+            if (session != null) {
+                if (tvSleep != null) tvSleep.setText(session.getFormattedDuration());
+                if (tvSleepQuality != null) tvSleepQuality.setText(String.format(Locale.US, "Quality %d%%", session.qualityScore));
+                if (progressQuality != null) progressQuality.setProgressCompat(session.qualityScore, true);
+            }
+        });
         fitnessDataManager.getWaterCupsLiveData().observe(getViewLifecycleOwner(), cups -> {
             if (tvWaterCups != null && progressWater != null) {
                 int waterGoal = fitnessDataManager.getWaterGoal();
                 int progress = fitnessDataManager.getWaterProgressPercent();
                 tvWaterCups.setText(cups + "/" + waterGoal + " Cups");
                 progressWater.setProgress(progress);
+            }
+        });
+
+        fitnessDataManager.getLatestHeartRateLiveData().observe(getViewLifecycleOwner(), hr -> {
+            if (tvHeartRate != null) {
+                if (hr != null && hr > 0) {
+                    tvHeartRate.setText(hr + " Bpm");
+                } else {
+                    tvHeartRate.setText("-- Bpm");
+                }
             }
         });
     }
@@ -131,6 +162,9 @@ public class AnalyticsFragment extends Fragment {
             return;
         updateWaterUI();
         loadData();
+        
+        // Force a sync with connected wearables when viewing analytics
+        fitnessDataManager.syncWithWearable();
     }
 
     private void initViews(View view) {
@@ -141,7 +175,10 @@ public class AnalyticsFragment extends Fragment {
         progressTraining = view.findViewById(R.id.progressTraining);
         tvHeartRate = view.findViewById(R.id.tvHeartRate);
         tvSteps = view.findViewById(R.id.tvSteps);
+        tvActiveMinutes = view.findViewById(R.id.tvActiveMinutes);
         tvSleep = view.findViewById(R.id.tvSleep);
+        tvSleepQuality = view.findViewById(R.id.tvSleepQuality);
+        progressQuality = view.findViewById(R.id.progressQuality);
         tvWaterCups = view.findViewById(R.id.tvWaterCups);
         progressWater = view.findViewById(R.id.progressWater);
         btnAddWater = view.findViewById(R.id.btnAddWater);

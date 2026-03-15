@@ -64,15 +64,17 @@ public abstract class ExerciseDetector {
      */
     public static class DetectionResult {
         private final boolean isCorrect;
+        private final float confidence;
         private final String feedback;
         private final int repCount;
         private final String stage;
         private final List<String> errors;
         private final String correctionTip;
 
-        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors,
+        public DetectionResult(boolean isCorrect, float confidence, String feedback, int repCount, String stage, List<String> errors,
                 String correctionTip) {
             this.isCorrect = isCorrect;
+            this.confidence = confidence;
             this.feedback = feedback;
             this.repCount = repCount;
             this.stage = stage;
@@ -80,16 +82,20 @@ public abstract class ExerciseDetector {
             this.correctionTip = correctionTip;
         }
 
-        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage, List<String> errors) {
-            this(isCorrect, feedback, repCount, stage, errors, errors.isEmpty() ? "" : errors.get(0));
+        public DetectionResult(boolean isCorrect, float confidence, String feedback, int repCount, String stage, List<String> errors) {
+            this(isCorrect, confidence, feedback, repCount, stage, errors, errors.isEmpty() ? "" : errors.get(0));
         }
 
-        public DetectionResult(boolean isCorrect, String feedback, int repCount, String stage) {
-            this(isCorrect, feedback, repCount, stage, new ArrayList<>(), "");
+        public DetectionResult(boolean isCorrect, float confidence, String feedback, int repCount, String stage) {
+            this(isCorrect, confidence, feedback, repCount, stage, new ArrayList<>(), "");
         }
 
         public boolean isCorrect() {
             return isCorrect;
+        }
+
+        public float getConfidence() {
+            return confidence;
         }
 
         public String getFeedback() {

@@ -21,12 +21,17 @@ android {
 
     defaultConfig {
         applicationId = "com.alignify"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"${getProp("MAPBOX_ACCESS_TOKEN")}\"")
+        buildConfigField(
+            "String",
+            "MAPBOX_STYLE_URI",
+            "\"${getProp("MAPBOX_STYLE_URI").ifBlank { "mapbox://styles/shoryadhyani/cmms6pbia008y01sge7vqb3r6" }}\""
+        )
     }
 
     signingConfigs {
@@ -43,7 +48,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             // Use release signing config if available, otherwise use debug
             if (System.getenv("KEYSTORE_PATH") != null) {
                 signingConfig = signingConfigs.getByName("release")
@@ -58,6 +64,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
     }
 
     buildFeatures {
@@ -83,7 +93,7 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
     
     // Google Sign-In
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
     
     // Mapbox Maps SDK v11
     implementation("com.mapbox.maps:android:11.19.0")
@@ -108,11 +118,16 @@ dependencies {
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.7.0")
+
+    // Room Database
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    annotationProcessor("androidx.room:room-compiler:$roomVersion")
     
     // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.8.0"))
     implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-auth:23.1.0")
     implementation("com.google.firebase:firebase-storage")
     
     // Testing
@@ -122,6 +137,9 @@ dependencies {
     
     // Glide for image loading
     implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    // Health Connect
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     
     // MPAndroidChart for activity graphs

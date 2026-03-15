@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.widget.ImageView;
@@ -20,11 +21,13 @@ import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
+import com.alignify.util.SleepTrackingHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.mapbox.maps.Style;
 import android.view.View;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
@@ -32,6 +35,11 @@ import com.google.firebase.auth.FirebaseUser;
 
 import java.text.NumberFormat;
 import java.util.Locale;
+import java.util.Set;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.health.connect.client.PermissionController;
+import com.alignify.data.WearableDataManager;
 
 /**
  * Settings screen for configuring goals, units, and profile.
@@ -51,11 +59,16 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvUserEmail;
     private ImageView ivProfileImage;
     private SwitchMaterial switchWaterReminders;
+    private SwitchMaterial switchSleepTracking;
     private TextView tvThemeMode;
+    private TextView tvMapStyle;
 
     // Guard flag to prevent listener re-trigger during programmatic setChecked()
     // calls
     private boolean isUpdatingUI = false;
+
+    // Health Connect Permission Launcher
+    private ActivityResultLauncher<Set<String>> requestPermissionActivityContract;
 
     // Data
     private FitnessDataManager fitnessDataManager;
@@ -85,6 +98,19 @@ public class SettingsActivity extends AppCompatActivity {
         googleSignInClient = GoogleSignIn.getClient(this, gso);
 
         initViews();
+
+        // Initialize Health Connect Permission Launcher
+        requestPermissionActivityContract = registerForActivityResult(
+                PermissionController.createRequestPermissionResultContract(),
+                granted -> {
+                    if (granted.containsAll(WearableDataManager.getRequiredPermissions())) {
+                        Toast.makeText(this, "Health Connect synced successfully", Toast.LENGTH_SHORT).show();
+                        fitnessDataManager.syncWithWearable();
+                    } else {
+                        Toast.makeText(this, "Some Health Connect permissions were denied", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
         loadSettings();
         loadUserProfile();
         setupListeners();
@@ -125,7 +151,9 @@ public class SettingsActivity extends AppCompatActivity {
         tvUserEmail = findViewById(R.id.tvUserEmail);
         ivProfileImage = findViewById(R.id.ivProfileImage);
         switchWaterReminders = findViewById(R.id.switchWaterReminders);
+        switchSleepTracking = findViewById(R.id.switchSleepTracking);
         tvThemeMode = findViewById(R.id.tvThemeMode);
+        tvMapStyle = findViewById(R.id.tvMapStyle);
 
         // Set app version dynamically from PackageInfo
         TextView tvAppVersion = findViewById(R.id.tvAppVersion);
@@ -152,11 +180,22 @@ public class SettingsActivity extends AppCompatActivity {
         // Guard against listener re-trigger during programmatic setChecked()
         isUpdatingUI = true;
         switchWaterReminders.setChecked(prefs.getBoolean(KEY_WATER_REMINDERS, true));
+
+        if (switchSleepTracking != null) {
+            if (SleepTrackingHelper.isAccelerometerAvailable(this)) {
+                switchSleepTracking.setChecked(SleepTrackingHelper.isSleepTrackingEnabled(this));
+            } else {
+                switchSleepTracking.setEnabled(false);
+                switchSleepTracking.setChecked(false);
+            }
+        }
+
         isUpdatingUI = false;
 
         // Update theme mode display
         String themeMode = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
         updateThemeModeDisplay(themeMode);
+        updateMapStyleDisplay(AlignifyApp.resolveMapStyleUri(this));
 
         updateUI();
     }
@@ -250,6 +289,20 @@ public class SettingsActivity extends AppCompatActivity {
         });
         findViewById(R.id.settingLogout).setOnClickListener(v -> showLogoutConfirmation());
 
+        View settingConnectedDevices = findViewById(R.id.settingConnectedDevices);
+        if (settingConnectedDevices != null) {
+            settingConnectedDevices.setOnClickListener(v -> {
+                if (!WearableDataManager.isHealthConnectAvailable(this)) {
+                    Toast.makeText(this, "Health Connect is not installed or available on this device",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                // Launch the intent to authorize Health Connect
+                requestPermissionActivityContract.launch(WearableDataManager.getRequiredPermissions());
+            });
+        }
+
         switchWaterReminders.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isUpdatingUI)
                 return;
@@ -266,10 +319,30 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        if (switchSleepTracking != null) {
+            switchSleepTracking.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isUpdatingUI)
+                    return;
+
+                if (isChecked) {
+                    SleepTrackingHelper.startSleepTracking(this);
+                    Toast.makeText(this, "Sleep tracking enabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    SleepTrackingHelper.stopSleepTracking(this);
+                    Toast.makeText(this, "Sleep tracking disabled", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
         // Theme mode selector
         View settingTheme = findViewById(R.id.settingDarkMode);
         if (settingTheme != null) {
             settingTheme.setOnClickListener(v -> showThemeModeDialog());
+        }
+
+        View settingMapStyle = findViewById(R.id.settingMapStyle);
+        if (settingMapStyle != null) {
+            settingMapStyle.setOnClickListener(v -> showMapStyleDialog());
         }
     }
 
@@ -321,6 +394,102 @@ public class SettingsActivity extends AppCompatActivity {
                     updateThemeModeDisplay(selected);
                     dialog.dismiss();
                     AppCompatDelegate.setDefaultNightMode(nightMode);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void updateMapStyleDisplay(String styleUri) {
+        if (tvMapStyle == null) {
+            return;
+        }
+        tvMapStyle.setText(AlignifyApp.getMapStyleLabel(styleUri));
+    }
+
+    private void showMapStyleDialog() {
+        final String[] labels = {
+                "Streets",
+                "Outdoors",
+                "Light",
+                "Dark",
+                "Satellite",
+                "Custom URI"
+        };
+        final String[] styleUris = {
+                AlignifyApp.MAP_STYLE_STREETS,
+                AlignifyApp.MAP_STYLE_OUTDOORS,
+                AlignifyApp.MAP_STYLE_LIGHT,
+                AlignifyApp.MAP_STYLE_DARK,
+                AlignifyApp.MAP_STYLE_SATELLITE
+        };
+
+        String currentStyle = AlignifyApp.resolveMapStyleUri(this);
+        int checkedItem = 5;
+        for (int i = 0; i < styleUris.length; i++) {
+            if (styleUris[i].equals(currentStyle)) {
+                checkedItem = i;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Map Style")
+                .setSingleChoiceItems(labels, checkedItem, (dialog, which) -> {
+                    if (which == 5) {
+                        dialog.dismiss();
+                        showCustomMapStyleDialog();
+                        return;
+                    }
+
+                    AlignifyApp.saveMapStyleUri(this, styleUris[which]);
+                    updateMapStyleDisplay(styleUris[which]);
+                    Toast.makeText(this, "Map style updated", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showCustomMapStyleDialog() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String currentStyle = prefs.getString(AlignifyApp.KEY_MAP_STYLE_URI, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
+
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setHint("mapbox://styles/username/style_id");
+        input.setText(currentStyle);
+        input.setSelection(input.getText().length());
+
+        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = dpToPx(20);
+        params.rightMargin = dpToPx(20);
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Custom Map Style URI")
+                .setMessage("Paste style URI, e.g. mapbox://styles/shoryadhyani/cmms6pbia008y01sge7vqb3r6")
+                .setView(container)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String value = input.getText().toString().trim();
+                    String normalized = AlignifyApp.normalizeMapStyleInput(value);
+                    if (normalized == null) {
+                        Toast.makeText(this,
+                                "Invalid style. Use mapbox://styles/... or paste a Mapbox Studio style URL.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    AlignifyApp.saveMapStyleUri(this, normalized);
+                    updateMapStyleDisplay(normalized);
+                    Toast.makeText(this, "Custom map style saved", Toast.LENGTH_SHORT).show();
+                })
+                .setNeutralButton("Use Studio Style", (dialog, which) -> {
+                    AlignifyApp.saveMapStyleUri(this, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
+                    updateMapStyleDisplay(AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
+                    Toast.makeText(this, "Studio style applied", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();

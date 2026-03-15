@@ -59,6 +59,7 @@ public class PlankDetector extends ExerciseDetector {
 
             return new DetectionResult(
                     true,
+                    1.0f,
                     "Get into plank position",
                     getRepCount(),
                     "rest");
@@ -88,11 +89,13 @@ public class PlankDetector extends ExerciseDetector {
         }
 
         // Use ML model if available
+        float confidence = 1.0f;
         if (tfliteInterpreter != null) {
             try {
                 float[] features = LandmarkUtils.extractPlankFeatures(result);
                 if (features != null) {
                     int prediction = tfliteInterpreter.predictClass(features);
+                    confidence = tfliteInterpreter.predictConfidence(features);
                     switch (prediction) {
                         case 1:
                             if (!errors.contains("Lower your hips")) {
@@ -122,6 +125,7 @@ public class PlankDetector extends ExerciseDetector {
 
         return new DetectionResult(
                 isCorrect,
+                confidence,
                 feedback,
                 getRepCount(),
                 "holding",

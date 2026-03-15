@@ -333,7 +333,10 @@ public class ProfileSetupActivity extends AppCompatActivity {
         try {
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             String imageFileName = "PROFILE_" + timeStamp + "_";
-            File storageDir = getCacheDir();
+            File storageDir = new File(getCacheDir(), "images");
+            if (!storageDir.exists()) {
+                storageDir.mkdirs();
+            }
             return File.createTempFile(imageFileName, ".jpg", storageDir);
         } catch (IOException e) {
             e.printStackTrace();

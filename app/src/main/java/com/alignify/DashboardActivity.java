@@ -174,6 +174,9 @@ public class DashboardActivity extends AppCompatActivity {
 
         // Load today's activity from Firestore
         loadTodayActivityFromFirestore();
+        
+        // Force a sync with connected wearables when viewing the dashboard
+        fitnessDataManager.syncWithWearable();
     }
 
     @Override

@@ -232,16 +232,29 @@ public class RunFragment extends Fragment {
             return;
         }
         mapboxMap = mapView.getMapboxMap();
-        mapboxMap.loadStyle(Style.MAPBOX_STREETS, style -> {
-            mapStyleLoaded = true;
-            Log.d(TAG, "Mapbox style loaded");
+        String selectedStyleUri = AlignifyApp.resolveMapStyleUri(requireContext());
+        try {
+            mapboxMap.loadStyle(selectedStyleUri, style -> {
+                mapStyleLoaded = true;
+                Log.d(TAG, "Mapbox style loaded: " + selectedStyleUri);
 
-            // Enable location puck (blue dot)
-            if (hasLocationPermission()) {
-                enableLocationPuck();
-                zoomToCurrentLocation();
-            }
-        });
+                // Enable location puck (blue dot)
+                if (hasLocationPermission()) {
+                    enableLocationPuck();
+                    zoomToCurrentLocation();
+                }
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load selected map style. Falling back to Streets.", e);
+            mapboxMap.loadStyle(Style.MAPBOX_STREETS, style -> {
+                mapStyleLoaded = true;
+                Log.d(TAG, "Fallback map style loaded: streets");
+                if (hasLocationPermission()) {
+                    enableLocationPuck();
+                    zoomToCurrentLocation();
+                }
+            });
+        }
 
         // Feature 3: Intercept touch on MapView to prevent ViewPager2 swipe
         mapView.setOnTouchListener((v, event) -> {

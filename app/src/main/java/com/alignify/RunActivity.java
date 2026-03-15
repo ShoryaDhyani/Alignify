@@ -207,15 +207,28 @@ public class RunActivity extends AppCompatActivity {
             return;
         }
         mapboxMap = mapView.getMapboxMap();
-        mapboxMap.loadStyle(Style.MAPBOX_STREETS, style -> {
-            mapStyleLoaded = true;
-            Log.d(TAG, "Mapbox style loaded");
+        String selectedStyleUri = AlignifyApp.resolveMapStyleUri(this);
+        try {
+            mapboxMap.loadStyle(selectedStyleUri, style -> {
+                mapStyleLoaded = true;
+                Log.d(TAG, "Mapbox style loaded: " + selectedStyleUri);
 
-            if (hasLocationPermission()) {
-                enableLocationPuck();
-                zoomToCurrentLocation();
-            }
-        });
+                if (hasLocationPermission()) {
+                    enableLocationPuck();
+                    zoomToCurrentLocation();
+                }
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load selected map style. Falling back to Streets.", e);
+            mapboxMap.loadStyle(Style.MAPBOX_STREETS, style -> {
+                mapStyleLoaded = true;
+                Log.d(TAG, "Fallback map style loaded: streets");
+                if (hasLocationPermission()) {
+                    enableLocationPuck();
+                    zoomToCurrentLocation();
+                }
+            });
+        }
 
         // Feature 3: Intercept touch on MapView to prevent swipe navigation
         mapView.setOnTouchListener((v, event) -> {

@@ -138,6 +138,22 @@ public class TFLiteInterpreter {
     }
 
     /**
+     * Get the confidence of the predicted class.
+     */
+    public float predictConfidence(float[] input) {
+        float[] probabilities = predict(input);
+        float maxValue = probabilities[0];
+
+        for (int i = 1; i < probabilities.length; i++) {
+            if (probabilities[i] > maxValue) {
+                maxValue = probabilities[i];
+            }
+        }
+
+        return maxValue;
+    }
+
+    /**
      * Get expected input size.
      */
     public int getInputSize() {

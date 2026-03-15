@@ -39,6 +39,18 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Posture Warning Border -->
+    <View
+        android:id="@+id/postureWarningBorder"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#44FF0000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Top Status Bar -->
     <LinearLayout
         android:id="@+id/topBar"
@@ -283,8 +295,34 @@
                         android:layout_height="6dp"
                         android:layout_marginTop="4dp"
                         android:max="100"
-                        android:progress="92"
+                        android:progress="0"
                         android:progressDrawable="@drawable/progress_session_score" />
+                </LinearLayout>
+
+                <!-- Model Confidence -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ML Confidence"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="10sp" />
+
+                    <ProgressBar
+                        android:id="@+id/mlConfidenceProgress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="6dp"
+                        android:layout_marginTop="4dp"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressDrawable="@drawable/progress_form_quality" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

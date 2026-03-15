@@ -53,6 +53,7 @@ public class SquatDetector extends ExerciseDetector {
         if (leftKneeAngle == null && rightKneeAngle == null) {
             return new DetectionResult(
                     true,
+                    1.0f,
                     "Position yourself in frame",
                     getRepCount(),
                     currentStage);
@@ -99,11 +100,13 @@ public class SquatDetector extends ExerciseDetector {
         }
 
         // Use ML model if available for additional error detection
+        float confidence = 1.0f;
         if (tfliteInterpreter != null) {
             try {
                 float[] features = LandmarkUtils.extractSquatFeatures(result);
                 if (features != null) {
                     int prediction = tfliteInterpreter.predictClass(features);
+                    confidence = tfliteInterpreter.predictConfidence(features);
                     if (prediction == 1) {
                         errors.add("Knees caving inward");
                         isCorrect = false;
@@ -128,6 +131,7 @@ public class SquatDetector extends ExerciseDetector {
 
         return new DetectionResult(
                 isCorrect,
+                confidence,
                 feedback,
                 getRepCount(),
                 currentStage,

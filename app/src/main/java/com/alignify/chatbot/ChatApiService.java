@@ -4,6 +4,10 @@ import android.util.Log;
 
 import com.alignify.data.DailyActivity;
 import com.alignify.data.UserRepository;
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GetTokenResult;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -13,10 +17,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -44,8 +51,66 @@ public class ChatApiService {
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(new AuthInterceptor())
+                // TODO: Uncomment certificate pinning once you have verified the SPKI pin.
+                // Get the pin by running on Linux/macOS (or WSL):
+                // echo | openssl s_client -connect alignify.shoryadhyani.me:443 2>/dev/null \
+                // | openssl x509 -pubkey -noout \
+                // | openssl pkey -pubin -outform DER \
+                // | openssl dgst -sha256 -binary | base64
+                // Include a backup pin (the CA/intermediate) to avoid lockout on cert rotation.
+                // .certificatePinner(new CertificatePinner.Builder()
+                // .add("alignify.shoryadhyani.me", "sha256/<LEAF_SPKI_SHA256_BASE64>")
+                // .add("alignify.shoryadhyani.me", "sha256/<BACKUP_CA_SPKI_SHA256_BASE64>")
+                // .build())
                 .build();
         this.gson = new Gson();
+    }
+
+    /**
+     * OkHttp interceptor that attaches a Firebase ID token to every request.
+     * Runs on OkHttp's background dispatcher thread — safe to block via
+     * Tasks.await().
+     * On 401 it retries once with a force-refreshed token.
+     */
+    private static final class AuthInterceptor implements Interceptor {
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Request original = chain.request();
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user == null) {
+                return chain.proceed(original);
+            }
+            try {
+                GetTokenResult tokenResult = Tasks.await(
+                        user.getIdToken(false), 30, TimeUnit.SECONDS);
+                String idToken = tokenResult.getToken();
+                if (idToken == null) {
+                    return chain.proceed(original);
+                }
+                Request authenticated = original.newBuilder()
+                        .header("Authorization", "Bearer " + idToken)
+                        .build();
+                Response response = chain.proceed(authenticated);
+                if (response.code() == 401) {
+                    // Token expired — force-refresh and retry once
+                    response.close();
+                    GetTokenResult refreshed = Tasks.await(
+                            user.getIdToken(true), 30, TimeUnit.SECONDS);
+                    String freshToken = refreshed.getToken();
+                    if (freshToken == null) {
+                        return chain.proceed(original);
+                    }
+                    return chain.proceed(original.newBuilder()
+                            .header("Authorization", "Bearer " + freshToken)
+                            .build());
+                }
+                return response;
+            } catch (ExecutionException | InterruptedException | TimeoutException e) {
+                Log.e(TAG, "Failed to get Firebase ID token — proceeding unauthenticated", e);
+                return chain.proceed(original);
+            }
+        }
     }
 
     // ==================== Callback Interfaces ====================

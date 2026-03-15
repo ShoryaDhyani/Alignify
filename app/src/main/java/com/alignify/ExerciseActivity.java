@@ -40,6 +40,7 @@ import com.alignify.databinding.ActivityExerciseBinding;
 import com.alignify.data.UserRepository;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.exercises.*;
+import com.alignify.ml.PostureClassifier;
 
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -61,6 +62,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private Handler mainHandler;
     private PoseLandmarkerHelper poseLandmarkerHelper;
     private ExerciseDetector exerciseDetector;
+    private PostureClassifier postureClassifier;
 
     private final AtomicBoolean isDetecting = new AtomicBoolean(false);
     private String exerciseType = "bicep_curl";
@@ -199,6 +201,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         }
 
         binding.exerciseNameText.setText(exerciseDetector.getExerciseName());
+        postureClassifier = new PostureClassifier();
     }
 
     private void setupUI() {
@@ -485,7 +488,8 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                                         false);
 
                                 ExerciseDetector.DetectionResult detectionResult = exerciseDetector.detect(poseResult);
-                                updateUI(detectionResult);
+                                PostureClassifier.PostureState postureState = postureClassifier.classify(poseResult);
+                                updateUI(detectionResult, postureState);
                                 binding.overlayView.setFeedbackColor(detectionResult.isCorrect());
                             });
                         }
@@ -679,8 +683,11 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
             // Run exercise detection
             ExerciseDetector.DetectionResult detectionResult = exerciseDetector.detect(result);
 
+            // Run posture classification
+            PostureClassifier.PostureState postureState = postureClassifier.classify(result);
+
             // Update UI
-            updateUI(detectionResult);
+            updateUI(detectionResult, postureState);
 
             // Update overlay color
             binding.overlayView.setFeedbackColor(detectionResult.isCorrect());
@@ -692,7 +699,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         runOnUiThread(() -> Toast.makeText(this, error, Toast.LENGTH_SHORT).show());
     }
 
-    private void updateUI(ExerciseDetector.DetectionResult result) {
+    private void updateUI(ExerciseDetector.DetectionResult result, PostureClassifier.PostureState postureState) {
         // Update rep counter - plank shows hold time in seconds, others show rep count
         if (exerciseType.equals("plank")) {
             binding.repCounterLabel.setText("HOLD");
@@ -716,6 +723,16 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         int repBonus = Math.min(result.getRepCount() * 5, 50); // Up to 50 points from reps
         int sessionScore = Math.min((formQuality / 2) + repBonus, 100);
         binding.sessionScoreProgress.setProgress(sessionScore);
+
+        // Model Confidence
+        binding.mlConfidenceProgress.setProgress((int) (result.getConfidence() * 100));
+
+        // Posture warning border
+        if (postureState == PostureClassifier.PostureState.CRITICAL) {
+            binding.postureWarningBorder.setVisibility(View.VISIBLE);
+        } else {
+            binding.postureWarningBorder.setVisibility(View.GONE);
+        }
 
         // Update feedback icon
         if (result.isCorrect()) {
