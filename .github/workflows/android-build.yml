@@ -40,14 +40,16 @@ jobs:
           [ -n "${{ secrets.MAPBOX_ACCESS_TOKEN }}" ] && echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
 
       - name: Inject Mapbox downloads token into gradle.properties
-        if: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN != '' }}
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        if: ${{ env.MAPBOX_DOWNLOADS_TOKEN != '' }}
         run: |
-          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}|g" gradle.properties
+          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
 
       - name: Decode google-services.json
-        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
         run: |
           echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
 
