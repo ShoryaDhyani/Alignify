@@ -140,11 +140,11 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     
     // Glide for image loading
-    implementation("com.github.bumptech.glide:glide:4.16.0")
+    implementation("com.github.bumptech.glide:glide:5.0.5")
 
     // Health Connect
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
-    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:5.0.5")
     
     // MPAndroidChart for activity graphs
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
