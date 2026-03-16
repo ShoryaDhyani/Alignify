@@ -13,6 +13,12 @@ jobs:
   build:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message || '', '[skip ci]')
     runs-on: ubuntu-latest
+    environment: myapp
+    env:
+      MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
+      MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
+      MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
 
     steps:
       - name: Checkout code
@@ -36,19 +42,15 @@ jobs:
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          [ -n "${{ secrets.MAPS_API_KEY }}" ] && echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
-          [ -n "${{ secrets.MAPBOX_ACCESS_TOKEN }}" ] && echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
+          [ -n "$MAPS_API_KEY" ] && echo "MAPS_API_KEY=$MAPS_API_KEY" >> local.properties
+          [ -n "$MAPBOX_ACCESS_TOKEN" ] && echo "MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN" >> local.properties
 
       - name: Inject Mapbox downloads token into gradle.properties
-        env:
-          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
         if: ${{ env.MAPBOX_DOWNLOADS_TOKEN != '' }}
         run: |
           sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
 
       - name: Decode google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
         run: |
           echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
@@ -85,6 +87,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+    env:
+      MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
+      MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
+      MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
 
     steps:
       - name: Checkout code
@@ -93,8 +100,8 @@ jobs:
       - name: Validate signing secrets
         run: |
           missing=""
-          [ -z "${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}" ] && missing="$missing MAPBOX_DOWNLOADS_TOKEN"
-          [ -z "${{ secrets.GOOGLE_SERVICES_JSON }}" ] && missing="$missing GOOGLE_SERVICES_JSON"
+          [ -z "$MAPBOX_DOWNLOADS_TOKEN" ] && missing="$missing MAPBOX_DOWNLOADS_TOKEN"
+          [ -z "$GOOGLE_SERVICES_JSON" ] && missing="$missing GOOGLE_SERVICES_JSON"
           [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]   && missing="$missing KEYSTORE_BASE64"
           [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] && missing="$missing KEYSTORE_PASSWORD"
           [ -z "${{ secrets.KEY_ALIAS }}" ]         && missing="$missing KEY_ALIAS"
@@ -115,16 +122,14 @@ jobs:
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          [ -n "${{ secrets.MAPS_API_KEY }}" ] && echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
-          [ -n "${{ secrets.MAPBOX_ACCESS_TOKEN }}" ] && echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
+          [ -n "$MAPS_API_KEY" ] && echo "MAPS_API_KEY=$MAPS_API_KEY" >> local.properties
+          [ -n "$MAPBOX_ACCESS_TOKEN" ] && echo "MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN" >> local.properties
 
       - name: Inject Mapbox downloads token into gradle.properties
         run: |
-          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}|g" gradle.properties
+          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
 
       - name: Decode google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
 
