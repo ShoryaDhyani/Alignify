@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message || '', '[skip ci]')
     runs-on: ubuntu-latest
 
     steps:
@@ -36,14 +36,16 @@ jobs:
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
-          echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
+          [ -n "${{ secrets.MAPS_API_KEY }}" ] && echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
+          [ -n "${{ secrets.MAPBOX_ACCESS_TOKEN }}" ] && echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
 
       - name: Inject Mapbox downloads token into gradle.properties
+        if: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN != '' }}
         run: |
           sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}|g" gradle.properties
 
       - name: Decode google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
@@ -56,6 +58,7 @@ jobs:
         run: ./gradlew assembleDebug --parallel --build-cache
 
       - name: Run Android Lint
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: ./gradlew lint --parallel --build-cache
 
       - name: Upload Lint Report
@@ -88,6 +91,8 @@ jobs:
       - name: Validate signing secrets
         run: |
           missing=""
+          [ -z "${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}" ] && missing="$missing MAPBOX_DOWNLOADS_TOKEN"
+          [ -z "${{ secrets.GOOGLE_SERVICES_JSON }}" ] && missing="$missing GOOGLE_SERVICES_JSON"
           [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]   && missing="$missing KEYSTORE_BASE64"
           [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] && missing="$missing KEYSTORE_PASSWORD"
           [ -z "${{ secrets.KEY_ALIAS }}" ]         && missing="$missing KEY_ALIAS"
@@ -108,8 +113,8 @@ jobs:
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
-          echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
+          [ -n "${{ secrets.MAPS_API_KEY }}" ] && echo "MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}" >> local.properties
+          [ -n "${{ secrets.MAPBOX_ACCESS_TOKEN }}" ] && echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
 
       - name: Inject Mapbox downloads token into gradle.properties
         run: |
@@ -146,5 +151,6 @@ jobs:
           name: Alignify v${{ steps.get_version.outputs.VERSION }}
           draft: false
           prerelease: false
+          overwrite_files: true
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
