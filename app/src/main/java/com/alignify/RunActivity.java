@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
+import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -174,6 +176,9 @@ public class RunActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_run);
 
+        // Ask for location immediately — before anything else
+        requestLocationPermission();
+
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         initLocationListener();
         initViews();
@@ -182,7 +187,6 @@ public class RunActivity extends AppCompatActivity {
         setupControls();
         setupNavigation();
         ensureStepService();
-        requestLocationPermission();
 
         // Setup swipe navigation
         swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_RUN);
@@ -305,6 +309,7 @@ public class RunActivity extends AppCompatActivity {
                             new CameraOptions.Builder()
                                     .center(point)
                                     .zoom(17.0)
+                                    .pitch(25.0)
                                     .build());
                 }
                 updateStats();
@@ -328,9 +333,25 @@ public class RunActivity extends AppCompatActivity {
     }
 
     private void requestLocationPermission() {
-        if (!hasLocationPermission()) {
+        if (hasLocationPermission()) return;
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)) {
+            // User denied once — explain before asking again
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Location required")
+                    .setMessage("Location access is needed to track your route and distance while running.")
+                    .setPositiveButton("Allow", (d, w) -> ActivityCompat.requestPermissions(this,
+                            new String[]{
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION},
+                            LOCATION_PERMISSION_REQUEST))
+                    .setNegativeButton("Not now", null)
+                    .show();
+        } else {
             ActivityCompat.requestPermissions(this,
-                    new String[] { Manifest.permission.ACCESS_FINE_LOCATION },
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION},
                     LOCATION_PERMISSION_REQUEST);
         }
     }
@@ -346,8 +367,24 @@ public class RunActivity extends AppCompatActivity {
                     zoomToCurrentLocation();
                 }
             } else {
-                Toast.makeText(this, "Location permission needed for route tracking",
-                        Toast.LENGTH_SHORT).show();
+                // Permanently denied — guide user to app settings
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Location blocked")
+                            .setMessage("Location permission was permanently denied. Enable it in Settings to track your route.")
+                            .setPositiveButton("Open Settings", (d, w) -> {
+                                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", getPackageName(), null));
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            })
+                            .setNegativeButton("Not now", null)
+                            .show();
+                } else {
+                    Toast.makeText(this, "Location permission needed for route tracking",
+                            Toast.LENGTH_SHORT).show();
+                }
             }
         }
     }
@@ -365,7 +402,8 @@ public class RunActivity extends AppCompatActivity {
                 mapboxMap.setCamera(
                         new CameraOptions.Builder()
                                 .center(pos)
-                                .zoom(16.0)
+                                .zoom(17.0)
+                                .pitch(25.0)
                                 .build());
             } else if (mapboxMap != null) {
                 // No cached location — request a one-shot update to center camera on first fix
@@ -388,7 +426,8 @@ public class RunActivity extends AppCompatActivity {
                         mapboxMap.setCamera(
                                 new CameraOptions.Builder()
                                         .center(pos)
-                                        .zoom(16.0)
+                                        .zoom(17.0)
+                                        .pitch(25.0)
                                         .build());
                     }
                     if (locationManager != null)

@@ -1,7 +1,9 @@
 package com.alignify;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -13,6 +15,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -49,7 +52,8 @@ public class LoginActivity extends AppCompatActivity {
     private static final String KEY_USER_AGE = "user_age";
     private static final String KEY_USER_GENDER = "user_gender";
 
-    // Google OAuth Web Client ID — loaded from R.string.default_web_client_id (auto-generated from google-services.json)
+    // Google OAuth Web Client ID — loaded from R.string.default_web_client_id
+    // (auto-generated from google-services.json)
 
     private EditText emailInput;
     private EditText passwordInput;
@@ -602,13 +606,30 @@ public class LoginActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         boolean profileComplete = prefs.getBoolean(KEY_PROFILE_COMPLETE, false);
 
-        Intent intent;
-        if (profileComplete) {
-            intent = new Intent(this, HomeActivity.class);
-        } else {
-            intent = new Intent(this, ProfileSetupActivity.class);
+        if (!profileComplete) {
+            launchActivity(ProfileSetupActivity.class);
+            return;
         }
 
+        // Profile is complete — request location so we can open RunActivity with
+        // tracking ready
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            launchActivity(RunActivity.class);
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+    }
+
+    private final ActivityResultLauncher<String> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), granted -> {
+                // Whether granted or denied, proceed — RunActivity handles missing permission
+                // gracefully
+                launchActivity(RunActivity.class);
+            });
+
+    private void launchActivity(Class<?> cls) {
+        Intent intent = new Intent(this, cls);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();

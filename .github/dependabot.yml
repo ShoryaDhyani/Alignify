@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Keep Gradle dependencies up to date (security patches, new versions)
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      firebase:
+        patterns:
+          - "com.google.firebase*"
+          - "com.google.gms*"
+      androidx:
+        patterns:
+          - "androidx.*"
+      mediapipe-tflite:
+        patterns:
+          - "com.google.mediapipe*"
+          - "org.tensorflow*"
+
+  # Keep GitHub Actions pinned versions up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5

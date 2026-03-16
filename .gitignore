@@ -94,3 +94,12 @@ adapters
 .gsd/STATE.md
 .gsd/JOURNAL.md
 .gsd/TODO.md
+CHANGELOG.md
+GSD-STYLE.md
+LICENSE
+PROJECT_RULES.md
+VERSION
+cert.pem
+cert_tmp.pem
+model_capabilities.yaml
+.agent/
