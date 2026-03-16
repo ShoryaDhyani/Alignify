@@ -36,6 +36,7 @@ import com.alignify.util.StepCounterHelper;
 import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.LineString;
 import com.mapbox.geojson.Point;
+import com.mapbox.geojson.Polygon;
 import com.mapbox.maps.CameraOptions;
 import com.mapbox.maps.CoordinateBounds;
 import com.mapbox.maps.EdgeInsets;
@@ -43,16 +44,19 @@ import com.mapbox.maps.MapView;
 import com.mapbox.maps.MapboxMap;
 import com.mapbox.maps.Style;
 import com.mapbox.maps.extension.style.layers.LayerUtils;
+import com.mapbox.maps.extension.style.layers.generated.FillLayer;
 import com.mapbox.maps.extension.style.layers.generated.LineLayer;
 import com.mapbox.maps.extension.style.layers.properties.generated.LineCap;
 import com.mapbox.maps.extension.style.layers.properties.generated.LineJoin;
 import com.mapbox.maps.extension.style.sources.SourceUtils;
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource;
+import com.mapbox.maps.ImageHolder;
 import com.mapbox.maps.plugin.LocationPuck2D;
 import com.mapbox.maps.plugin.PuckBearing;
 import com.mapbox.maps.plugin.locationcomponent.LocationComponentPlugin;
 import com.mapbox.maps.plugin.locationcomponent.LocationComponentUtils;
-import com.mapbox.maps.ImageHolder;
+import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener;
+import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
@@ -70,6 +74,12 @@ public class RunActivity extends AppCompatActivity {
     private static final int LOCATION_PERMISSION_REQUEST = 2001;
     private static final String ROUTE_SOURCE_ID = "route-source";
     private static final String ROUTE_LAYER_ID = "route-layer";
+    private static final String DIRECTION_BEAM_SOURCE_ID = "direction-beam-source";
+    private static final String DIRECTION_BEAM_LAYER_ID = "direction-beam-layer";
+    private static final double DIRECTION_BEAM_START_OFFSET_METERS = 8.0;
+    private static final double DIRECTION_BEAM_LENGTH_METERS = 32.0;
+    private static final double DIRECTION_BEAM_HALF_ANGLE_DEGREES = 24.0;
+    private static final double DIRECTION_BEAM_STEP_DEGREES = 8.0;
 
     // Activity types
     private static final int TYPE_RUN = 0;
@@ -97,6 +107,16 @@ public class RunActivity extends AppCompatActivity {
     private LocationListener locationListener;
     private final List<Point> routePoints = new ArrayList<>();
     private boolean mapStyleLoaded = false;
+    private Point indicatorPoint;
+    private double indicatorBearing = Double.NaN;
+    private final OnIndicatorPositionChangedListener indicatorPositionListener = point -> {
+        indicatorPoint = point;
+        updateDirectionBeam();
+    };
+    private final OnIndicatorBearingChangedListener indicatorBearingListener = bearing -> {
+        indicatorBearing = bearing;
+        updateDirectionBeam();
+    };
 
     // State
     private int activityType = TYPE_RUN;
@@ -236,9 +256,11 @@ public class RunActivity extends AppCompatActivity {
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
                 isMapTouched = true;
                 v.getParent().requestDisallowInterceptTouchEvent(true);
+                updateDirectionBeam();
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                 isMapTouched = false;
                 v.getParent().requestDisallowInterceptTouchEvent(false);
+                updateDirectionBeam();
             }
             return false; // Don't consume — let MapView handle its own gestures
         });
@@ -251,9 +273,13 @@ public class RunActivity extends AppCompatActivity {
         locationComponent.setPuckBearing(PuckBearing.HEADING);
         locationComponent.setLocationPuck(
                 new LocationPuck2D(
-                        ImageHolder.Companion.from(R.drawable.ic_location_dot_cyan),
-                        ImageHolder.Companion.from(R.drawable.ic_location_heading_arrow),
-                        null));
+                        ImageHolder.Companion.from(R.drawable.map_puck_foreground),
+                        null,
+                        ImageHolder.Companion.from(R.drawable.map_puck_shadow)));
+        locationComponent.removeOnIndicatorPositionChangedListener(indicatorPositionListener);
+        locationComponent.removeOnIndicatorBearingChangedListener(indicatorBearingListener);
+        locationComponent.addOnIndicatorPositionChangedListener(indicatorPositionListener);
+        locationComponent.addOnIndicatorBearingChangedListener(indicatorBearingListener);
     }
 
     private void initLocationListener() {
@@ -406,7 +432,6 @@ public class RunActivity extends AppCompatActivity {
     private void drawRoute() {
         if (mapboxMap == null || !mapStyleLoaded || routePoints.size() < 2)
             return;
-
         Style style = mapboxMap.getStyle();
         if (style == null)
             return;
@@ -430,6 +455,77 @@ public class RunActivity extends AppCompatActivity {
             lineLayer.lineJoin(LineJoin.ROUND);
             LayerUtils.addLayer(style, lineLayer);
         }
+    }
+
+    private void updateDirectionBeam() {
+        if (mapboxMap == null || !mapStyleLoaded || indicatorPoint == null || Double.isNaN(indicatorBearing))
+            return;
+
+        Style style = mapboxMap.getStyle();
+        if (style == null)
+            return;
+
+        Polygon beamPolygon = createDirectionBeamPolygon(indicatorPoint, indicatorBearing);
+        GeoJsonSource existingSource = (GeoJsonSource) SourceUtils.getSource(style, DIRECTION_BEAM_SOURCE_ID);
+
+        if (existingSource != null) {
+            existingSource.feature(Feature.fromGeometry(beamPolygon));
+            return;
+        }
+
+        GeoJsonSource beamSource = new GeoJsonSource.Builder(DIRECTION_BEAM_SOURCE_ID)
+                .feature(Feature.fromGeometry(beamPolygon))
+                .build();
+        SourceUtils.addSource(style, beamSource);
+
+        FillLayer beamLayer = new FillLayer(DIRECTION_BEAM_LAYER_ID, DIRECTION_BEAM_SOURCE_ID);
+        beamLayer.fillColor(Color.parseColor("#4DA6FF"));
+        beamLayer.fillOpacity(0.34);
+        beamLayer.fillOutlineColor(Color.parseColor("#80C7FF"));
+        LayerUtils.addLayer(style, beamLayer);
+    }
+
+    private Polygon createDirectionBeamPolygon(Point origin, double bearingDegrees) {
+        double startOffsetMeters = DIRECTION_BEAM_START_OFFSET_METERS;
+        double lengthMeters = DIRECTION_BEAM_LENGTH_METERS;
+        List<Point> ring = new ArrayList<>();
+
+        // Build a sector band so the beam starts in front of the puck instead of
+        // overlapping it.
+        for (double angle = bearingDegrees - DIRECTION_BEAM_HALF_ANGLE_DEGREES; angle <= bearingDegrees
+                + DIRECTION_BEAM_HALF_ANGLE_DEGREES + 0.001; angle += DIRECTION_BEAM_STEP_DEGREES) {
+            ring.add(offsetPoint(origin, angle, startOffsetMeters));
+        }
+
+        for (double angle = bearingDegrees + DIRECTION_BEAM_HALF_ANGLE_DEGREES; angle >= bearingDegrees
+                - DIRECTION_BEAM_HALF_ANGLE_DEGREES - 0.001; angle -= DIRECTION_BEAM_STEP_DEGREES) {
+            ring.add(offsetPoint(origin, angle, lengthMeters));
+        }
+
+        if (!ring.isEmpty()) {
+            ring.add(ring.get(0));
+        }
+
+        List<List<Point>> coordinates = new ArrayList<>();
+        coordinates.add(ring);
+        return Polygon.fromLngLats(coordinates);
+    }
+
+    private Point offsetPoint(Point origin, double bearingDegrees, double distanceMeters) {
+        double radius = 6_371_000.0;
+        double angularDistance = distanceMeters / radius;
+        double bearingRadians = Math.toRadians(bearingDegrees);
+        double latitudeRadians = Math.toRadians(origin.latitude());
+        double longitudeRadians = Math.toRadians(origin.longitude());
+
+        double destinationLatitude = Math.asin(
+                Math.sin(latitudeRadians) * Math.cos(angularDistance)
+                        + Math.cos(latitudeRadians) * Math.sin(angularDistance) * Math.cos(bearingRadians));
+        double destinationLongitude = longitudeRadians + Math.atan2(
+                Math.sin(bearingRadians) * Math.sin(angularDistance) * Math.cos(latitudeRadians),
+                Math.cos(angularDistance) - Math.sin(latitudeRadians) * Math.sin(destinationLatitude));
+
+        return Point.fromLngLat(Math.toDegrees(destinationLongitude), Math.toDegrees(destinationLatitude));
     }
 
     private void clearRoute() {
@@ -778,6 +874,11 @@ public class RunActivity extends AppCompatActivity {
         super.onDestroy();
         timerHandler.removeCallbacks(timerRunnable);
         stopLocationUpdates();
+        if (mapView != null) {
+            LocationComponentPlugin locationComponent = LocationComponentUtils.getLocationComponent(mapView);
+            locationComponent.removeOnIndicatorPositionChangedListener(indicatorPositionListener);
+            locationComponent.removeOnIndicatorBearingChangedListener(indicatorBearingListener);
+        }
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 }

@@ -34,7 +34,8 @@ public class AlignifyApp extends Application {
         if (isValidMapboxPublicToken(mapboxToken)) {
             MapboxOptions.setAccessToken(mapboxToken);
         } else {
-            Log.w(TAG, "Mapbox access token missing/invalid. Set a real pk.* token in local.properties as MAPBOX_ACCESS_TOKEN.");
+            Log.w(TAG,
+                    "Mapbox access token missing/invalid. Set a real pk.* token in local.properties as MAPBOX_ACCESS_TOKEN.");
         }
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
