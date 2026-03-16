@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Validate Gradle wrapper checksum
         uses: gradle/actions/wrapper-validation@v3
@@ -62,6 +64,38 @@ jobs:
           else
             echo "::error::GOOGLE_SERVICES_JSON is neither valid JSON nor valid base64-encoded JSON"
             exit 1
+          fi
+
+      - name: Ensure debug Firebase client exists
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          if jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify.debug"' app/google-services.json >/dev/null; then
+            echo "google-services.json already contains com.alignify.debug"
+          elif jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify"' app/google-services.json >/dev/null; then
+            jq '
+              (.client[] | select(.client_info.android_client_info.package_name == "com.alignify")) as $base
+              | .client += [
+                (
+                  $base
+                  | .client_info.android_client_info.package_name = "com.alignify.debug"
+                  | if has("oauth_client") then
+                      .oauth_client |= map(
+                        if has("android_info") and .android_info.package_name == "com.alignify" then
+                          .android_info.package_name = "com.alignify.debug"
+                        else
+                          .
+                        end
+                      )
+                    else
+                      .
+                    end
+                )
+              ]
+            ' app/google-services.json > app/google-services.tmp.json
+            mv app/google-services.tmp.json app/google-services.json
+            echo "Added derived com.alignify.debug client for CI debug build"
+          else
+            echo "::warning::No com.alignify client found to derive com.alignify.debug"
           fi
 
       - name: Make gradlew executable
