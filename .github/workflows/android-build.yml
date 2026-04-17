@@ -159,6 +159,48 @@ jobs:
       - name: Clean Gradle wrapper
         run: rm -rf ~/.gradle/wrapper/dists
 
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          [ -n "$MAPS_API_KEY" ] && echo "MAPS_API_KEY=$MAPS_API_KEY" >> local.properties
+          [ -n "$MAPBOX_ACCESS_TOKEN" ] && echo "MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN" >> local.properties
+
+      - name: Inject Mapbox downloads token into gradle.properties
+        if: ${{ env.MAPBOX_DOWNLOADS_TOKEN != '' }}
+        run: |
+          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
+
+      - name: Decode google-services.json
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          if jq -e . >/dev/null 2>&1 <<<"$GOOGLE_SERVICES_JSON"; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif printf '%s' "$GOOGLE_SERVICES_JSON" | tr -d '\r\n ' | base64 --decode > app/google-services.json 2>/dev/null \
+            && jq -e . app/google-services.json >/dev/null 2>&1; then
+            echo "Decoded GOOGLE_SERVICES_JSON from base64"
+          else
+            echo "::error::GOOGLE_SERVICES_JSON is neither valid JSON nor valid base64-encoded JSON"
+            exit 1
+          fi
+
+      - name: Ensure debug Firebase client exists
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          if jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify.debug"' app/google-services.json >/dev/null; then
+            echo "google-services.json already contains com.alignify.debug"
+          elif jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify"' app/google-services.json >/dev/null; then
+            jq '
+              (.client[] | select(.client_info.android_client_info.package_name == "com.alignify")) as $base
+              | .client += [
+                (
+                  $base
+                  | .client_info.android_client_info.package_name = "com.alignify.debug"
+                )
+              ]
+            ' app/google-services.json > app/google-services.tmp.json
+            mv app/google-services.tmp.json app/google-services.json
+          fi
+
       - name: Decode Keystore
         run: |
           printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > ${{ github.workspace }}/release.keystore
