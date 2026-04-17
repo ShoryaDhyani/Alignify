@@ -1,186 +1,180 @@
 name: Android Build & Release
 
 on:
-push:
-branches: [main, master]
-tags:
-- "v*"
-pull_request:
-branches: [main, master]
-workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
-build:
-if: github.event_name != 'push' || !contains(github.event.head_commit.message || '', '[skip ci]')
-runs-on: ubuntu-latest
-environment: myapp
+  build:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message || '', '[skip ci]')
+    runs-on: ubuntu-latest
+    environment: myapp
 
-env:
-  MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
-  MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
-  MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
-  GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
-
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
-    with:
-      fetch-depth: 0
-
-  - name: Validate Gradle wrapper checksum
-    uses: gradle/actions/wrapper-validation@v3
-
-  - name: Secret scan (Gitleaks)
-    uses: gitleaks/gitleaks-action@v2
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
+      MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
+      MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
 
-  - name: Set up JDK 17
-    uses: actions/setup-java@v4
-    with:
-      java-version: "17"
-      distribution: "temurin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  # ✅ Safe Gradle cache (no wrapper/dists)
-  - name: Cache Gradle dependencies
-    uses: actions/cache@v4
-    with:
-      path: |
-        ~/.gradle/caches
-        ~/.gradle/native
-      key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-      restore-keys: gradle-
+      - name: Validate Gradle wrapper checksum
+        uses: gradle/actions/wrapper-validation@v3
 
-  # ✅ Fix: remove corrupted Gradle distribution
-  - name: Clean Gradle wrapper
-    run: rm -rf ~/.gradle/wrapper/dists
+      - name: Secret scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  - name: Create local.properties
-    run: |
-      echo "sdk.dir=$ANDROID_HOME" > local.properties
-      [ -n "$MAPS_API_KEY" ] && echo "MAPS_API_KEY=$MAPS_API_KEY" >> local.properties
-      [ -n "$MAPBOX_ACCESS_TOKEN" ] && echo "MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN" >> local.properties
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
 
-  - name: Inject Mapbox downloads token into gradle.properties
-    if: ${{ env.MAPBOX_DOWNLOADS_TOKEN != '' }}
-    run: |
-      sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/native
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
 
-  - name: Decode google-services.json
-    if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
-    run: |
-      if jq -e . >/dev/null 2>&1 <<<"$GOOGLE_SERVICES_JSON"; then
-        printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-      elif printf '%s' "$GOOGLE_SERVICES_JSON" | tr -d '\r\n ' | base64 --decode > app/google-services.json 2>/dev/null \
-        && jq -e . app/google-services.json >/dev/null 2>&1; then
-        echo "Decoded GOOGLE_SERVICES_JSON from base64"
-      else
-        echo "::error::GOOGLE_SERVICES_JSON is neither valid JSON nor valid base64-encoded JSON"
-        exit 1
-      fi
+      - name: Clean Gradle wrapper
+        run: rm -rf ~/.gradle/wrapper/dists
 
-  - name: Ensure debug Firebase client exists
-    if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
-    run: |
-      if jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify.debug"' app/google-services.json >/dev/null; then
-        echo "google-services.json already contains com.alignify.debug"
-      elif jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify"' app/google-services.json >/dev/null; then
-        jq '
-          (.client[] | select(.client_info.android_client_info.package_name == "com.alignify")) as $base
-          | .client += [
-            (
-              $base
-              | .client_info.android_client_info.package_name = "com.alignify.debug"
-            )
-          ]
-        ' app/google-services.json > app/google-services.tmp.json
-        mv app/google-services.tmp.json app/google-services.json
-      fi
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          [ -n "$MAPS_API_KEY" ] && echo "MAPS_API_KEY=$MAPS_API_KEY" >> local.properties
+          [ -n "$MAPBOX_ACCESS_TOKEN" ] && echo "MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN" >> local.properties
 
-  - name: Make gradlew executable
-    run: chmod +x ./gradlew
+      - name: Inject Mapbox downloads token into gradle.properties
+        if: ${{ env.MAPBOX_DOWNLOADS_TOKEN != '' }}
+        run: |
+          sed -i "s|YOUR_MAPBOX_SECRET_TOKEN|${MAPBOX_DOWNLOADS_TOKEN}|g" gradle.properties
 
-  # ✅ Retry + self-healing build
-  - name: Build Debug APK
-    run: |
-      ./gradlew assembleDebug --parallel --build-cache || \
-      (rm -rf ~/.gradle/wrapper/dists && ./gradlew assembleDebug)
+      - name: Decode google-services.json
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          if jq -e . >/dev/null 2>&1 <<<"$GOOGLE_SERVICES_JSON"; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif printf '%s' "$GOOGLE_SERVICES_JSON" | tr -d '\r\n ' | base64 --decode > app/google-services.json 2>/dev/null \
+            && jq -e . app/google-services.json >/dev/null 2>&1; then
+            echo "Decoded GOOGLE_SERVICES_JSON from base64"
+          else
+            echo "::error::GOOGLE_SERVICES_JSON is neither valid JSON nor valid base64-encoded JSON"
+            exit 1
+          fi
 
-  - name: Run Android Lint
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-    run: ./gradlew lint --parallel --build-cache
+      - name: Ensure debug Firebase client exists
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
+        run: |
+          if jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify.debug"' app/google-services.json >/dev/null; then
+            echo "google-services.json already contains com.alignify.debug"
+          elif jq -e '.client[]?.client_info.android_client_info.package_name == "com.alignify"' app/google-services.json >/dev/null; then
+            jq '
+              (.client[] | select(.client_info.android_client_info.package_name == "com.alignify")) as $base
+              | .client += [
+                (
+                  $base
+                  | .client_info.android_client_info.package_name = "com.alignify.debug"
+                )
+              ]
+            ' app/google-services.json > app/google-services.tmp.json
+            mv app/google-services.tmp.json app/google-services.json
+          fi
 
-  - name: Upload Lint Report
-    if: always()
-    uses: actions/upload-artifact@v4
-    with:
-      name: lint-report-${{ github.sha }}
-      path: app/build/reports/lint-results-*.html
-      retention-days: 30
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
-  - name: Upload Debug APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: app-debug-${{ github.sha }}
-      path: app/build/outputs/apk/debug/app-debug.apk
-      retention-days: 7
+      - name: Build Debug APK
+        run: |
+          ./gradlew assembleDebug --parallel --build-cache || \
+          (rm -rf ~/.gradle/wrapper/dists && ./gradlew assembleDebug)
 
+      - name: Run Android Lint
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: ./gradlew lint --parallel --build-cache
 
-release:
-needs: build
-runs-on: ubuntu-latest
-environment: myapp
-if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload Lint Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report-${{ github.sha }}
+          path: app/build/reports/lint-results-*.html
+          retention-days: 30
 
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
 
-permissions:
-  contents: write
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: myapp
+    if: startsWith(github.ref, 'refs/tags/v')
 
-env:
-  MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
-  MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
-  MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
-  GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
+    permissions:
+      contents: write
 
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
-
-  - name: Set up JDK 17
-    uses: actions/setup-java@v4
-    with:
-      java-version: "17"
-      distribution: "temurin"
-
-  - name: Cache Gradle dependencies
-    uses: actions/cache@v4
-    with:
-      path: |
-        ~/.gradle/caches
-        ~/.gradle/native
-      key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-      restore-keys: gradle-
-
-  - name: Clean Gradle wrapper
-    run: rm -rf ~/.gradle/wrapper/dists
-
-  - name: Decode Keystore
-    run: |
-      printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > ${{ github.workspace }}/release.keystore
-
-  - name: Make gradlew executable
-    run: chmod +x ./gradlew
-
-  - name: Build Signed Release APK
     env:
-      KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-    run: ./gradlew assembleRelease --parallel --build-cache
+      MAPS_API_KEY: ${{ secrets.MAPS_API_KEY || vars.MAPS_API_KEY || '' }}
+      MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN || '' }}
+      MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN || vars.MAPBOX_DOWNLOADS_TOKEN || '' }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON || vars.GOOGLE_SERVICES_JSON || '' }}
 
-  - name: Create GitHub Release
-    uses: softprops/action-gh-release@v2
-    with:
-      files: app/build/outputs/apk/release/app-release.apk
-```
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/native
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Clean Gradle wrapper
+        run: rm -rf ~/.gradle/wrapper/dists
+
+      - name: Decode Keystore
+        run: |
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > ${{ github.workspace }}/release.keystore
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --parallel --build-cache
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
