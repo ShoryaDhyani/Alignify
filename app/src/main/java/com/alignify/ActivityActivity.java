@@ -18,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
-import com.alignify.data.sleep.SleepSession;
 import com.alignify.data.UserRepository;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
@@ -34,7 +33,6 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -59,11 +57,6 @@ public class ActivityActivity extends AppCompatActivity {
     private ProgressBar progressTraining;
     private TextView tvHeartRate;
     private TextView tvSteps;
-    private TextView tvDistance; // Added field
-    private TextView tvActiveMinutes; // Added field
-    private TextView tvSleep;
-    private TextView tvSleepQuality; // Added field
-    private CircularProgressIndicator progressQuality; // Added field
     // Water tracking
     private TextView tvWaterCups;
     private ProgressBar progressWater;
@@ -122,19 +115,6 @@ public class ActivityActivity extends AppCompatActivity {
                 progressTraining.setProgress(trainingPercent);
             }
         });
-        fitnessDataManager.getActiveMinutesLiveData().observe(this, activeMinutes -> {
-            if (tvActiveMinutes != null) {
-                tvActiveMinutes.setText(activeMinutes + " min");
-            }
-        });
-
-        fitnessDataManager.getLastSleepLiveData().observe(this, session -> {
-            if (session != null) {
-                if (tvSleep != null) tvSleep.setText(session.getFormattedDuration());
-                if (tvSleepQuality != null) tvSleepQuality.setText(String.format(Locale.US, "Quality %d%%", session.qualityScore));
-                if (progressQuality != null) progressQuality.setProgressCompat(session.qualityScore, true);
-            }
-        });
 
         // Setup swipe navigation
         swipeDetector = NavigationHelper.createSwipeDetector(this, NavigationHelper.NAV_ANALYTICS);
@@ -163,11 +143,6 @@ public class ActivityActivity extends AppCompatActivity {
         progressTraining = findViewById(R.id.progressTraining);
         tvHeartRate = findViewById(R.id.tvHeartRate);
         tvSteps = findViewById(R.id.tvSteps);
-        tvDistance = findViewById(R.id.tvDistance); // Added findViewById
-        tvActiveMinutes = findViewById(R.id.tvActiveMinutes); // Added findViewById
-        tvSleep = findViewById(R.id.tvSleep);
-        tvSleepQuality = findViewById(R.id.tvSleepQuality); // Added findViewById
-        progressQuality = findViewById(R.id.progressQuality); // Added findViewById
         tvWaterCups = findViewById(R.id.tvWaterCups);
         progressWater = findViewById(R.id.progressWater);
         btnAddWater = findViewById(R.id.btnAddWater);
@@ -597,14 +572,6 @@ public class ActivityActivity extends AppCompatActivity {
         int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
         tvTrainingPercent.setText(trainingPercent + "%");
         progressTraining.setProgress(trainingPercent);
-
-        // Sleep
-        float sleepHours = activity.getSleepHours();
-        if (sleepHours > 0) {
-            tvSleep.setText(String.format(Locale.US, "%.1f hrs", sleepHours));
-        } else {
-            tvSleep.setText("-- hrs");
-        }
 
         // Heart rate (placeholder - would need health connect integration)
         tvHeartRate.setText("-- Bpm");

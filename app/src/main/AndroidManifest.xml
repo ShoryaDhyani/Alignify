@@ -150,15 +150,7 @@
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
         </activity>
-        
-        <!-- AI Fitness Chatbot -->
-        <activity
-            android:name=".chatbot.ChatbotActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize" />
 
-        
         <!-- Step Counter Foreground Service -->
         <!-- Uses FOREGROUND_SERVICE_HEALTH for Android 14+ -->
         <service

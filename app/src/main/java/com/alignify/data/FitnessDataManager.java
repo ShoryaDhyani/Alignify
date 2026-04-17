@@ -168,6 +168,20 @@ public class FitnessDataManager {
     }
 
     /**
+     * Delete old data older than 30 days to maintain performance.
+     * Called periodically to keep only recent data.
+     */
+    public void cleanupOldData() {
+        UserRepository.getInstance().deleteOldActivities(30, result -> {
+            if (result) {
+                Log.d(TAG, "Successfully cleaned up data older than 30 days");
+            } else {
+                Log.w(TAG, "Failed to cleanup old data");
+            }
+        });
+    }
+
+    /**
      * Check if it's a new day and reset daily counters.
      * Snapshots yesterday's data before resetting to avoid re-entrancy data loss.
      */
@@ -791,6 +805,9 @@ public class FitnessDataManager {
                     stepsLiveData.postValue(firestoreSteps);
                     caloriesLiveData.postValue(activity.getCalories());
                     distanceLiveData.postValue(activity.getDistance());
+                } else if (firestoreSteps == 0 && localSteps > 0) {
+                    // If Firestore shows 0 but local has data, sync the local data to Firestore
+                    syncToFirestore();
                 }
 
                 // For other metrics, take Firestore values if local is 0
@@ -801,6 +818,8 @@ public class FitnessDataManager {
                     setWaterCupsToday(activity.getWaterCups());
                 }
 
+                // Refresh LiveData to ensure UI shows updated data after any changes
+                loadInitialData();
                 Log.d(TAG, "Loaded and merged data from Firestore");
             }
 

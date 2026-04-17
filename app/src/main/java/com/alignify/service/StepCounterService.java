@@ -218,6 +218,7 @@ public class StepCounterService extends Service implements SensorEventListener {
 
     /**
      * Syncs step data to Firestore periodically to avoid excessive writes.
+     * Only syncs steps - FitnessDataManager handles calorie/distance calculation.
      */
     private void syncToFirestoreIfNeeded(int steps) {
         long now = System.currentTimeMillis();
@@ -225,12 +226,8 @@ public class StepCounterService extends Service implements SensorEventListener {
         long timeDelta = now - lastSyncTime;
 
         if (stepDelta >= SYNC_STEP_THRESHOLD || timeDelta >= SYNC_TIME_THRESHOLD) {
-            // Use CaloriesEngine for weight-aware calorie calculation
-            int calories = CaloriesEngine.getInstance(this).getCaloriesFromSteps(steps);
-            // Approximate distance in km (average stride ~0.7m)
-            float distance = steps * 0.0007f;
-
-            UserRepository.getInstance().updateTodaySteps(steps, calories, distance);
+            // Let FitnessDataManager handle sync with calculated calories and distance
+            FitnessDataManager.getInstance(this).syncToFirestore();
 
             lastSyncedSteps = steps;
             lastSyncTime = now;

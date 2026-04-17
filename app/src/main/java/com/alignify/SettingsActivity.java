@@ -21,7 +21,6 @@ import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
-import com.alignify.util.SleepTrackingHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -59,7 +58,6 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvUserEmail;
     private ImageView ivProfileImage;
     private SwitchMaterial switchWaterReminders;
-    private SwitchMaterial switchSleepTracking;
     private TextView tvThemeMode;
     private TextView tvMapStyle;
 
@@ -151,7 +149,6 @@ public class SettingsActivity extends AppCompatActivity {
         tvUserEmail = findViewById(R.id.tvUserEmail);
         ivProfileImage = findViewById(R.id.ivProfileImage);
         switchWaterReminders = findViewById(R.id.switchWaterReminders);
-        switchSleepTracking = findViewById(R.id.switchSleepTracking);
         tvThemeMode = findViewById(R.id.tvThemeMode);
         tvMapStyle = findViewById(R.id.tvMapStyle);
 
@@ -180,16 +177,6 @@ public class SettingsActivity extends AppCompatActivity {
         // Guard against listener re-trigger during programmatic setChecked()
         isUpdatingUI = true;
         switchWaterReminders.setChecked(prefs.getBoolean(KEY_WATER_REMINDERS, true));
-
-        if (switchSleepTracking != null) {
-            if (SleepTrackingHelper.isAccelerometerAvailable(this)) {
-                switchSleepTracking.setChecked(SleepTrackingHelper.isSleepTrackingEnabled(this));
-            } else {
-                switchSleepTracking.setEnabled(false);
-                switchSleepTracking.setChecked(false);
-            }
-        }
-
         isUpdatingUI = false;
 
         // Update theme mode display
@@ -318,21 +305,6 @@ public class SettingsActivity extends AppCompatActivity {
                 Toast.makeText(this, "Water reminders disabled", Toast.LENGTH_SHORT).show();
             }
         });
-
-        if (switchSleepTracking != null) {
-            switchSleepTracking.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isUpdatingUI)
-                    return;
-
-                if (isChecked) {
-                    SleepTrackingHelper.startSleepTracking(this);
-                    Toast.makeText(this, "Sleep tracking enabled", Toast.LENGTH_SHORT).show();
-                } else {
-                    SleepTrackingHelper.stopSleepTracking(this);
-                    Toast.makeText(this, "Sleep tracking disabled", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
 
         // Theme mode selector
         View settingTheme = findViewById(R.id.settingDarkMode);

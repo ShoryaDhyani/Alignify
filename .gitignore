@@ -75,6 +75,9 @@ test-results/
 proguard/
 mapping.txt
 
+# ML Model files (TensorFlow Lite)
+*.tflite
+
 # Local machine paths
 local.properties
 sdk.dir
