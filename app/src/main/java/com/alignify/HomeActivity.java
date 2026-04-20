@@ -74,13 +74,13 @@ public class HomeActivity extends AppCompatActivity {
 
         navHome = homeNav.findViewById(R.id.navHome);
         navExercises = homeNav.findViewById(R.id.navExercises);
-        navRun = homeNav.findViewById(R.id.navRun);
+//        navRun = homeNav.findViewById(R.id.navRun);
         navAnalytics = homeNav.findViewById(R.id.navAnalytics);
         navProfile = homeNav.findViewById(R.id.navProfile);
 
         navHomeIcon = homeNav.findViewById(R.id.navHomeIcon);
         navExercisesIcon = homeNav.findViewById(R.id.navExercisesIcon);
-        navRunIcon = homeNav.findViewById(R.id.navRunIcon);
+//        navRunIcon = homeNav.findViewById(R.id.navRunIcon);
         navAnalyticsIcon = homeNav.findViewById(R.id.navAnalyticsIcon);
         navProfileIcon = homeNav.findViewById(R.id.navProfileIcon);
 

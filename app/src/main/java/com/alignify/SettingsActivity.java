@@ -6,7 +6,6 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.widget.ImageView;
@@ -22,15 +21,8 @@ import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.NavigationHelper;
 import com.bumptech.glide.Glide;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.mapbox.maps.Style;
 import android.view.View;
 import com.google.android.material.switchmaterial.SwitchMaterial;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -75,9 +67,6 @@ public class SettingsActivity extends AppCompatActivity {
     private int waterGoal = 8;
     private boolean useKilometers = true;
 
-    private FirebaseAuth firebaseAuth;
-    private GoogleSignInClient googleSignInClient;
-
     // Swipe navigation
     private GestureDetector swipeDetector;
 
@@ -88,12 +77,6 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Initialize FitnessDataManager (single source of truth for goals)
         fitnessDataManager = FitnessDataManager.getInstance(this);
-
-        firebaseAuth = FirebaseAuth.getInstance();
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .build();
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
 
         initViews();
 
@@ -182,47 +165,31 @@ public class SettingsActivity extends AppCompatActivity {
         // Update theme mode display
         String themeMode = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
         updateThemeModeDisplay(themeMode);
-        updateMapStyleDisplay(AlignifyApp.resolveMapStyleUri(this));
-
         updateUI();
     }
 
     private void loadUserProfile() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // First check for custom display name saved in EditProfileActivity
+        // Load display name from SharedPreferences
         String savedDisplayName = prefs.getString("display_name", null);
-        String savedPhotoUri = prefs.getString("profile_photo_uri", null);
-
         if (savedDisplayName != null && !savedDisplayName.isEmpty()) {
             tvUserName.setText(savedDisplayName);
         } else {
-            // Fall back to Firebase/Google account
-            FirebaseUser user = firebaseAuth.getCurrentUser();
-            if (user != null && user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
-                tvUserName.setText(user.getDisplayName());
-            } else {
-                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-                if (account != null && account.getDisplayName() != null) {
-                    tvUserName.setText(account.getDisplayName());
-                } else {
-                    tvUserName.setText("User");
-                }
-            }
+            String userName = prefs.getString("user_name", "Guest User");
+            tvUserName.setText(userName);
         }
 
-        // Load email
-        FirebaseUser user = firebaseAuth.getCurrentUser();
-        if (user != null && user.getEmail() != null) {
-            tvUserEmail.setText(user.getEmail());
+        // Load email (guest users won't have one)
+        String email = prefs.getString("user_email", "");
+        if (email != null && !email.isEmpty()) {
+            tvUserEmail.setText(email);
         } else {
-            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-            if (account != null && account.getEmail() != null) {
-                tvUserEmail.setText(account.getEmail());
-            }
+            tvUserEmail.setText("Guest");
         }
 
-        // Load profile photo - prefer custom saved photo
+        // Load profile photo from local storage
+        String savedPhotoUri = prefs.getString("profile_photo_uri", null);
         if (savedPhotoUri != null) {
             Glide.with(this)
                     .load(Uri.parse(savedPhotoUri))
@@ -230,23 +197,6 @@ public class SettingsActivity extends AppCompatActivity {
                     .error(R.drawable.default_profile)
                     .circleCrop()
                     .into(ivProfileImage);
-        } else if (user != null && user.getPhotoUrl() != null) {
-            Glide.with(this)
-                    .load(user.getPhotoUrl())
-                    .placeholder(R.drawable.default_profile)
-                    .error(R.drawable.default_profile)
-                    .circleCrop()
-                    .into(ivProfileImage);
-        } else {
-            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-            if (account != null && account.getPhotoUrl() != null) {
-                Glide.with(this)
-                        .load(account.getPhotoUrl())
-                        .placeholder(R.drawable.default_profile)
-                        .error(R.drawable.default_profile)
-                        .circleCrop()
-                        .into(ivProfileImage);
-            }
         }
     }
 
@@ -311,11 +261,6 @@ public class SettingsActivity extends AppCompatActivity {
         if (settingTheme != null) {
             settingTheme.setOnClickListener(v -> showThemeModeDialog());
         }
-
-        View settingMapStyle = findViewById(R.id.settingMapStyle);
-        if (settingMapStyle != null) {
-            settingMapStyle.setOnClickListener(v -> showMapStyleDialog());
-        }
     }
 
     private void updateThemeModeDisplay(String themeMode) {
@@ -366,102 +311,6 @@ public class SettingsActivity extends AppCompatActivity {
                     updateThemeModeDisplay(selected);
                     dialog.dismiss();
                     AppCompatDelegate.setDefaultNightMode(nightMode);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void updateMapStyleDisplay(String styleUri) {
-        if (tvMapStyle == null) {
-            return;
-        }
-        tvMapStyle.setText(AlignifyApp.getMapStyleLabel(styleUri));
-    }
-
-    private void showMapStyleDialog() {
-        final String[] labels = {
-                "Streets",
-                "Outdoors",
-                "Light",
-                "Dark",
-                "Satellite",
-                "Custom URI"
-        };
-        final String[] styleUris = {
-                AlignifyApp.MAP_STYLE_STREETS,
-                AlignifyApp.MAP_STYLE_OUTDOORS,
-                AlignifyApp.MAP_STYLE_LIGHT,
-                AlignifyApp.MAP_STYLE_DARK,
-                AlignifyApp.MAP_STYLE_SATELLITE
-        };
-
-        String currentStyle = AlignifyApp.resolveMapStyleUri(this);
-        int checkedItem = 5;
-        for (int i = 0; i < styleUris.length; i++) {
-            if (styleUris[i].equals(currentStyle)) {
-                checkedItem = i;
-                break;
-            }
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Map Style")
-                .setSingleChoiceItems(labels, checkedItem, (dialog, which) -> {
-                    if (which == 5) {
-                        dialog.dismiss();
-                        showCustomMapStyleDialog();
-                        return;
-                    }
-
-                    AlignifyApp.saveMapStyleUri(this, styleUris[which]);
-                    updateMapStyleDisplay(styleUris[which]);
-                    Toast.makeText(this, "Map style updated", Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void showCustomMapStyleDialog() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String currentStyle = prefs.getString(AlignifyApp.KEY_MAP_STYLE_URI, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setHint("mapbox://styles/username/style_id");
-        input.setText(currentStyle);
-        input.setSelection(input.getText().length());
-
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
-        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
-        params.leftMargin = dpToPx(20);
-        params.rightMargin = dpToPx(20);
-        input.setLayoutParams(params);
-        container.addView(input);
-
-        new AlertDialog.Builder(this)
-                .setTitle("Custom Map Style URI")
-                .setMessage("Paste style URI, e.g. mapbox://styles/shoryadhyani/cmms6pbia008y01sge7vqb3r6")
-                .setView(container)
-                .setPositiveButton("Save", (dialog, which) -> {
-                    String value = input.getText().toString().trim();
-                    String normalized = AlignifyApp.normalizeMapStyleInput(value);
-                    if (normalized == null) {
-                        Toast.makeText(this,
-                                "Invalid style. Use mapbox://styles/... or paste a Mapbox Studio style URL.",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    AlignifyApp.saveMapStyleUri(this, normalized);
-                    updateMapStyleDisplay(normalized);
-                    Toast.makeText(this, "Custom map style saved", Toast.LENGTH_SHORT).show();
-                })
-                .setNeutralButton("Use Studio Style", (dialog, which) -> {
-                    AlignifyApp.saveMapStyleUri(this, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-                    updateMapStyleDisplay(AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-                    Toast.makeText(this, "Studio style applied", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -608,7 +457,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void saveSettings() {
-        // Save goals to FitnessDataManager (syncs to Firestore automatically)
+        // Save goals to FitnessDataManager (syncs to local SQLite automatically)
         fitnessDataManager.setStepGoal(stepGoal);
         fitnessDataManager.setCaloriesGoal(calorieGoal);
         fitnessDataManager.setWaterGoal(waterGoal);
@@ -625,29 +474,25 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void showLogoutConfirmation() {
         new AlertDialog.Builder(this)
-                .setTitle("Logout")
-                .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> performLogout())
+                .setTitle("Reset App")
+                .setMessage("This will clear all your local data and return to initial setup. Continue?")
+                .setPositiveButton("Reset", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void performLogout() {
-        if (firebaseAuth != null) {
-            firebaseAuth.signOut();
-        }
+        // Clear all SharedPreferences
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().clear().apply();
 
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            prefs.edit().clear().apply();
+        Toast.makeText(this, "Data cleared successfully", Toast.LENGTH_SHORT).show();
 
-            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
-
-            Intent intent = new Intent(this, LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-        });
+        // Navigate back to LoginActivity (which will re-create guest session)
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private int dpToPx(int dp) {

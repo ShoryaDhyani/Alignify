@@ -14,9 +14,7 @@ import com.alignify.ActivityActivity;
 import com.alignify.DashboardActivity;
 import com.alignify.MainActivity;
 import com.alignify.R;
-import com.alignify.RunActivity;
 import com.alignify.SettingsActivity;
-import com.alignify.StepActivity;
 
 /**
  * Centralized helper for bottom navigation setup across activities.
@@ -33,8 +31,7 @@ public class NavigationHelper {
 
     // Swipe navigation screen order (all 5 tabs participate in swipe nav)
     private static final int[] SWIPE_ORDER = { NAV_HOME, NAV_EXERCISES, NAV_RUN, NAV_ANALYTICS, NAV_PROFILE };
-    private static final Class<?>[] SWIPE_ACTIVITIES = { DashboardActivity.class, MainActivity.class,
-            RunActivity.class, ActivityActivity.class, SettingsActivity.class };
+    private static final Class<?>[] SWIPE_ACTIVITIES = { DashboardActivity.class, MainActivity.class, ActivityActivity.class, SettingsActivity.class };
 
     private static final int SWIPE_THRESHOLD = 100;
     private static final int SWIPE_VELOCITY_THRESHOLD = 200;
@@ -44,7 +41,7 @@ public class NavigationHelper {
      * Sets up bottom navigation click listeners for an activity (5 tabs).
      */
     public static void setupBottomNavigation(Activity activity, int currentNavTab,
-            View navHome, View navExercises, View navRun, View navAnalytics, View navProfile) {
+            View navHome, View navExercises, View navAnalytics, View navProfile) {
 
         if (navHome != null) {
             navHome.setOnClickListener(v -> {
@@ -63,18 +60,6 @@ public class NavigationHelper {
                 if (currentNavTab != NAV_EXERCISES) {
                     activity.startActivity(new Intent(activity, MainActivity.class));
                     applyDirectionalTransition(activity, currentNavTab, NAV_EXERCISES);
-                    if (currentNavTab != NAV_PROFILE) {
-                        activity.finish();
-                    }
-                }
-            });
-        }
-
-        if (navRun != null) {
-            navRun.setOnClickListener(v -> {
-                if (currentNavTab != NAV_RUN) {
-                    activity.startActivity(new Intent(activity, RunActivity.class));
-                    applyDirectionalTransition(activity, currentNavTab, NAV_RUN);
                     if (currentNavTab != NAV_PROFILE) {
                         activity.finish();
                     }
@@ -106,15 +91,7 @@ public class NavigationHelper {
         highlightNavItem(activity, currentNavTab);
     }
 
-    /**
-     * 4-tab setup for activities that don't explicitly reference navRun.
-     * Finds navRun from the layout and delegates to the 5-tab method.
-     */
-    public static void setupBottomNavigation(Activity activity, int currentNavTab,
-            View navHome, View navExercises, View navAnalytics, View navProfile) {
-        View navRun = activity.findViewById(R.id.navRun);
-        setupBottomNavigation(activity, currentNavTab, navHome, navExercises, navRun, navAnalytics, navProfile);
-    }
+
 
     /**
      * Highlights the active navigation item.
@@ -122,7 +99,6 @@ public class NavigationHelper {
     public static void highlightNavItem(Activity activity, int index) {
         ImageView navHomeIcon = activity.findViewById(R.id.navHomeIcon);
         ImageView navExercisesIcon = activity.findViewById(R.id.navExercisesIcon);
-        ImageView navRunIcon = activity.findViewById(R.id.navRunIcon);
         ImageView navAnalyticsIcon = activity.findViewById(R.id.navAnalyticsIcon);
         ImageView navProfileIcon = activity.findViewById(R.id.navProfileIcon);
 
@@ -134,9 +110,6 @@ public class NavigationHelper {
         if (navExercisesIcon != null)
             navExercisesIcon.setColorFilter(index == NAV_EXERCISES ? activeColor : inactiveColor);
         // Center Record button: always white icon on accent bg, no tint change
-        if (navRunIcon != null && index == NAV_RUN) {
-            navRunIcon.setColorFilter(activity.getColor(android.R.color.white));
-        }
         if (navAnalyticsIcon != null)
             navAnalyticsIcon.setColorFilter(index == NAV_ANALYTICS ? activeColor : inactiveColor);
         if (navProfileIcon != null)

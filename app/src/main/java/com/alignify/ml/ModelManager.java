@@ -5,11 +5,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,9 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Manages ML model downloads, versioning, and caching.
- * Downloads models from Firebase Storage on-demand and caches locally.
- * Falls back to bundled assets if download fails.
+ * Manages ML model versioning and caching.
+ * Models are loaded from bundled assets.
+ * Remote update functionality has been removed (offline-only mode).
  */
 public class ModelManager {
     private static final String TAG = "ModelManager";
@@ -40,13 +35,8 @@ public class ModelManager {
 
     private static ModelManager instance;
     private final Context context;
-    private final FirebaseFirestore firestore;
-    private final FirebaseStorage storage;
     private final SharedPreferences prefs;
     private final File modelsDir;
-
-    // Track available updates
-    private final Map<String, ModelInfo> availableUpdates = new HashMap<>();
 
     public interface ModelCallback {
         void onModelReady(File modelFile);
@@ -78,8 +68,6 @@ public class ModelManager {
 
     private ModelManager(Context context) {
         this.context = context.getApplicationContext();
-        this.firestore = FirebaseFirestore.getInstance();
-        this.storage = FirebaseStorage.getInstance();
         this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         this.modelsDir = new File(context.getFilesDir(), MODELS_DIR);
 
@@ -96,113 +84,12 @@ public class ModelManager {
     }
 
     /**
-     * Check for model updates and notify via callback.
-     * Shows dialog to user if updates are available.
+     * Check for model updates.
+     * In offline mode, no remote updates are available.
      */
     public void checkForUpdates(Context activityContext, UpdateCheckCallback callback) {
-        firestore.collection("model_versions")
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    availableUpdates.clear();
-                    List<ModelInfo> updates = new ArrayList<>();
-
-                    for (DocumentSnapshot doc : querySnapshot) {
-                        String modelName = doc.getId();
-                        Long remoteVersion = doc.getLong("version");
-                        String storagePath = doc.getString("path");
-
-                        if (remoteVersion != null && storagePath != null) {
-                            int localVersion = getLocalVersion(modelName);
-
-                            if (remoteVersion > localVersion) {
-                                ModelInfo info = new ModelInfo(modelName, remoteVersion.intValue(),
-                                        localVersion, storagePath);
-                                updates.add(info);
-                                availableUpdates.put(modelName, info);
-                            }
-                        }
-                    }
-
-                    if (!updates.isEmpty()) {
-                        // Show update dialog to user
-                        showUpdateDialog(activityContext, updates, callback);
-                    } else {
-                        callback.onNoUpdates();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error checking for updates", e);
-                    callback.onError(e.getMessage());
-                });
-    }
-
-    /**
-     * Show dialog to user about available model updates.
-     */
-    private void showUpdateDialog(Context activityContext, List<ModelInfo> updates,
-            UpdateCheckCallback callback) {
-        StringBuilder message = new StringBuilder();
-        message.append("New AI model updates are available:\n\n");
-
-        for (ModelInfo info : updates) {
-            String displayName = formatModelName(info.name);
-            message.append("• ").append(displayName)
-                    .append(" (v").append(info.localVersion)
-                    .append(" → v").append(info.remoteVersion).append(")\n");
-        }
-
-        message.append("\nDownload now for improved accuracy?");
-
-        new AlertDialog.Builder(activityContext)
-                .setTitle("Model Updates Available")
-                .setMessage(message.toString())
-                .setPositiveButton("Download", (dialog, which) -> {
-                    downloadAllUpdates(updates, callback);
-                })
-                .setNegativeButton("Later", (dialog, which) -> {
-                    callback.onUpdatesAvailable(updates);
-                })
-                .setIcon(android.R.drawable.ic_dialog_info)
-                .show();
-    }
-
-    /**
-     * Download all pending model updates.
-     */
-    private void downloadAllUpdates(List<ModelInfo> updates, UpdateCheckCallback callback) {
-        final int[] completed = { 0 };
-        final int[] failed = { 0 };
-        final int total = updates.size();
-
-        for (ModelInfo info : updates) {
-            downloadModel(info.name, info.storagePath, info.remoteVersion, new ModelCallback() {
-                @Override
-                public void onModelReady(File modelFile) {
-                    synchronized (completed) {
-                        completed[0]++;
-                        if (completed[0] == total) {
-                            if (failed[0] == 0) {
-                                callback.onNoUpdates();
-                            } else {
-                                callback.onError(failed[0] + " of " + total + " models failed to download");
-                            }
-                        }
-                    }
-                }
-
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "Error downloading " + info.name + ": " + error);
-                    synchronized (completed) {
-                        completed[0]++;
-                        failed[0]++;
-                        if (completed[0] == total) {
-                            callback.onError(failed[0] + " of " + total + " models failed to download");
-                        }
-                    }
-                }
-            });
-        }
+        // No remote update checks in offline mode
+        callback.onNoUpdates();
     }
 
     /**
@@ -217,14 +104,8 @@ public class ModelManager {
             return;
         }
 
-        // Check if update is available
-        if (availableUpdates.containsKey(modelName)) {
-            ModelInfo info = availableUpdates.get(modelName);
-            downloadModel(modelName, info.storagePath, info.remoteVersion, callback);
-        } else {
-            // Use bundled asset - return null to signal use asset loader
-            callback.onModelReady(null);
-        }
+        // Use bundled asset - return null to signal use asset loader
+        callback.onModelReady(null);
     }
 
     /**
@@ -254,35 +135,6 @@ public class ModelManager {
     }
 
     /**
-     * Download a model from Firebase Storage.
-     */
-    private void downloadModel(String modelName, String storagePath, int version,
-            ModelCallback callback) {
-        StorageReference modelRef = storage.getReference().child(storagePath);
-        File tempFile = new File(modelsDir, modelName + ".tflite.tmp");
-        File finalFile = new File(modelsDir, modelName + ".tflite");
-
-        modelRef.getFile(tempFile)
-                .addOnSuccessListener(taskSnapshot -> {
-                    // Atomic rename to prevent corrupt files from interrupted downloads
-                    if (tempFile.renameTo(finalFile)) {
-                        prefs.edit().putInt(modelName, version).apply();
-                        availableUpdates.remove(modelName);
-                        Log.d(TAG, "Downloaded " + modelName + " v" + version);
-                        callback.onModelReady(finalFile);
-                    } else {
-                        tempFile.delete();
-                        callback.onError("Failed to finalize model file");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    tempFile.delete(); // Clean up partial download
-                    Log.e(TAG, "Failed to download " + modelName, e);
-                    callback.onError(e.getMessage());
-                });
-    }
-
-    /**
      * Get locally stored version number for a model.
      */
     public int getLocalVersion(String modelName) {
@@ -309,9 +161,10 @@ public class ModelManager {
 
     /**
      * Check if a model has an update available.
+     * Always returns false in offline mode.
      */
     public boolean hasUpdate(String modelName) {
-        return availableUpdates.containsKey(modelName);
+        return false;
     }
 
     /**

@@ -25,6 +25,7 @@ import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import com.alignify.util.ProfileImageHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.alignify.data.UserRepository;
@@ -34,9 +35,6 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.alignify.util.ProfileImageHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -169,8 +167,6 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // Profile image click
-        profileImageCard.setOnClickListener(v -> showImagePickerDialog());
 
         // Gender buttons
         btnMale.setOnClickListener(v -> selectGender("Male", btnMale));
@@ -249,45 +245,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         selectedBtn.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.accent_10));
     }
 
-    private void showImagePickerDialog() {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this, R.style.BottomSheetDialogTheme);
-        View bottomSheetView = getLayoutInflater().inflate(R.layout.bottom_sheet_image_picker, null);
-        bottomSheetDialog.setContentView(bottomSheetView);
 
-        // Get views
-        ImageButton btnClose = bottomSheetView.findViewById(R.id.btnCloseImagePicker);
-        CardView cardCamera = bottomSheetView.findViewById(R.id.cardCamera);
-        CardView cardGallery = bottomSheetView.findViewById(R.id.cardGallery);
-        CardView cardRemovePhoto = bottomSheetView.findViewById(R.id.cardRemovePhoto);
-
-        // Show remove option if profile image exists
-        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
-            cardRemovePhoto.setVisibility(View.VISIBLE);
-        }
-
-        // Close button
-        btnClose.setOnClickListener(v -> bottomSheetDialog.dismiss());
-
-        // Camera option
-        cardCamera.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
-            checkCameraPermissionAndOpen();
-        });
-
-        // Gallery option
-        cardGallery.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
-            openGallery();
-        });
-
-        // Remove photo option
-        cardRemovePhoto.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
-            removeProfileImage();
-        });
-
-        bottomSheetDialog.show();
-    }
 
     private void removeProfileImage() {
         profileImageUrl = null;
@@ -370,8 +328,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
 
-        // Also save to Firestore
-        UserRepository.getInstance().updateProfileImageUrl(url, new UserRepository.OnCompleteListener() {
+        // Also save to local DB
+        UserRepository.getInstance(this).updateProfileImageUrl(url, new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
             }
@@ -519,8 +477,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
                 .putBoolean(KEY_PROFILE_COMPLETE, true)
                 .apply();
 
-        // Save to Firestore
-        UserRepository.getInstance().saveUserProfile(
+        // Save to local SQLite
+        UserRepository.getInstance(this).saveUserProfile(
                 email, name, bmi, category, selectedActivity,
                 (int) height, (int) weight, age, selectedGender,
                 new UserRepository.OnCompleteListener() {

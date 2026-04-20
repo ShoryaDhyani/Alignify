@@ -141,7 +141,7 @@ public class ActivityActivity extends AppCompatActivity {
         tvCalories = findViewById(R.id.tvCalories);
         tvTrainingPercent = findViewById(R.id.tvTrainingPercent);
         progressTraining = findViewById(R.id.progressTraining);
-        tvHeartRate = findViewById(R.id.tvHeartRate);
+//        tvHeartRate = findViewById(R.id.tvHeartRate);
         tvSteps = findViewById(R.id.tvSteps);
         tvWaterCups = findViewById(R.id.tvWaterCups);
         progressWater = findViewById(R.id.progressWater);
@@ -169,9 +169,6 @@ public class ActivityActivity extends AppCompatActivity {
 
         // Steps card click - open step tracking activity
         View stepsCard = findViewById(R.id.stepsCard);
-        if (stepsCard != null) {
-            stepsCard.setOnClickListener(v -> showStepsBottomSheet());
-        }
 
         // Bottom navigation
         NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_ANALYTICS,
@@ -276,7 +273,7 @@ public class ActivityActivity extends AppCompatActivity {
 
         // Load data for selected date
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
-        UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
+        UserRepository.getInstance(this).getDailyActivity(dateKey, activity -> {
             runOnUiThread(() -> {
                 if (activity != null) {
                     tvHistorySteps.setText(String.valueOf(activity.getSteps()));
@@ -324,7 +321,7 @@ public class ActivityActivity extends AppCompatActivity {
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
-            UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
+            UserRepository.getInstance(this).getDailyActivity(dateKeys[i], activity -> {
                 if (activity != null) {
                     stepsData[index] = activity.getSteps();
                 } else {
@@ -406,7 +403,7 @@ public class ActivityActivity extends AppCompatActivity {
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
-            UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
+            UserRepository.getInstance(this).getDailyActivity(dateKeys[i], activity -> {
                 if (activity != null) {
                     minutesData[index] = activity.getActiveMinutes();
                 } else {
@@ -541,7 +538,7 @@ public class ActivityActivity extends AppCompatActivity {
     private void loadDataForDate(Calendar date) {
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
 
-        UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
+        UserRepository.getInstance(this).getDailyActivity(dateKey, activity -> {
             runOnUiThread(() -> {
                 if (activity != null) {
                     todayActivity = activity;
@@ -605,70 +602,7 @@ public class ActivityActivity extends AppCompatActivity {
         return (int) (dp * getResources().getDisplayMetrics().density);
     }
 
-    private void showStepsBottomSheet() {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View sheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_steps, null);
-        bottomSheetDialog.setContentView(sheetView);
 
-        // Get views
-        ProgressBar progressSteps = sheetView.findViewById(R.id.progressSteps);
-        TextView tvCurrentSteps = sheetView.findViewById(R.id.tvCurrentSteps);
-        TextView tvGoalSteps = sheetView.findViewById(R.id.tvGoalSteps);
-        TextView tvStepMotivation = sheetView.findViewById(R.id.tvStepMotivation);
-        TextView tvDistance = sheetView.findViewById(R.id.tvDistance);
-        TextView tvStepCalories = sheetView.findViewById(R.id.tvStepCalories);
-        TextView tvActiveTime = sheetView.findViewById(R.id.tvActiveTime);
-
-        // Use FitnessDataManager for consistent step goal across all activities
-        int currentSteps = fitnessDataManager.getStepsToday();
-        int goalSteps = fitnessDataManager.getStepGoal();
-
-        if (todayActivity != null && todayActivity.getSteps() > currentSteps) {
-            currentSteps = todayActivity.getSteps();
-        }
-
-        int progressPercent = goalSteps > 0 ? (int) ((currentSteps * 100.0f) / goalSteps) : 0;
-        progressPercent = Math.min(progressPercent, 100);
-
-        // Update UI
-        tvCurrentSteps.setText(String.valueOf(currentSteps));
-        tvGoalSteps.setText("of " + goalSteps);
-        progressSteps.setMax(100);
-        progressSteps.setProgress(progressPercent);
-
-        // Use FitnessDataManager calculated values for consistency
-        float distanceKm = fitnessDataManager.getDistanceToday();
-        int calories = fitnessDataManager.getCaloriesToday();
-        int activeMinutes = fitnessDataManager.getActiveMinutesToday();
-
-        tvDistance.setText(String.format(Locale.US, "%.1f km", distanceKm));
-        tvStepCalories.setText(String.valueOf(calories));
-        tvActiveTime.setText(activeMinutes + " min");
-
-        // Motivation text
-        if (progressPercent >= 100) {
-            tvStepMotivation.setText("Goal achieved! You're a champion!");
-        } else if (progressPercent >= 75) {
-            tvStepMotivation.setText("Almost there! " + (goalSteps - currentSteps) + " steps to go!");
-        } else if (progressPercent >= 50) {
-            tvStepMotivation.setText("Halfway there! Keep moving!");
-        } else if (progressPercent >= 25) {
-            tvStepMotivation.setText("Great start! Keep it up!");
-        } else {
-            tvStepMotivation.setText("🌅 Start your day with a walk!");
-        }
-
-        // Set goal button
-        sheetView.findViewById(R.id.btnSetStepGoal).setOnClickListener(v -> {
-            // TODO: Show goal setting dialog
-            bottomSheetDialog.dismiss();
-        });
-
-        // Close button
-        sheetView.findViewById(R.id.btnCloseSteps).setOnClickListener(v -> bottomSheetDialog.dismiss());
-
-        bottomSheetDialog.show();
-    }
 
     /**
      * Helper class to hold day item data.

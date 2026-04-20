@@ -3,7 +3,6 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 // Read keys from local.properties (local builds) with env var fallback (CI)
@@ -94,13 +93,7 @@ dependencies {
     implementation("androidx.fragment:fragment:1.6.2")
     implementation("androidx.viewpager2:viewpager2:1.0.0")
     implementation("androidx.cardview:cardview:1.0.0")
-    
-    // Google Sign-In
-    implementation("com.google.android.gms:play-services-auth:21.3.0")
-    
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
+
     
     // CameraX
     val cameraxVersion = "1.3.1"
@@ -124,12 +117,7 @@ dependencies {
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     annotationProcessor("androidx.room:room-compiler:$roomVersion")
-    
-    // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:33.8.0"))
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-auth:23.1.0")
-    implementation("com.google.firebase:firebase-storage")
+
     
     // Testing
     testImplementation("junit:junit:4.13.2")

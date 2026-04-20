@@ -5,12 +5,6 @@
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Location permissions for GPS tracking -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    
-    <!-- Step Counter permissions -->
     <!-- Required for Android 10+ to access step counter sensor -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     
@@ -40,10 +34,6 @@
     <uses-feature 
         android:name="android.hardware.sensor.stepcounter" 
         android:required="false" />
-    
-    <!-- Chatbot permissions -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Health Connect Permissions -->
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
@@ -80,12 +70,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
-        <!-- Signup Activity -->
-        <activity
-            android:name=".SignupActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
         
         <!-- Profile Setup -->
         <activity
@@ -128,12 +112,7 @@
             android:name=".StepActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
-        
-        <!-- Run/Walk Activity (Strava-style tracker) -->
-        <activity
-            android:name=".RunActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+
         
         <!-- Activity Screen (Redesigned History) -->
         <activity

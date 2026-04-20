@@ -170,8 +170,8 @@ public class ActivityEngine {
             calories = caloriesEngine.getCaloriesFromWalking((int) (durationSeconds / 60), avgCadence);
         }
 
-        // Save to Firestore
-        UserRepository.getInstance().saveActivity(
+        // Save to local SQLite
+        UserRepository.getInstance(context).saveActivity(
                 type.name,
                 "auto",
                 sessionStartTime,
@@ -208,7 +208,7 @@ public class ActivityEngine {
             calories = caloriesEngine.getCaloriesFromWalking(durationMinutes, 90);
         }
 
-        UserRepository.getInstance().saveActivity(
+        UserRepository.getInstance(context).saveActivity(
                 type,
                 "manual",
                 startTime,
