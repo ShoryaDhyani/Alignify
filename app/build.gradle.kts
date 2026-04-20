@@ -112,11 +112,11 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraxVersion")
     
     // MediaPipe Tasks - Pose Landmarker
-    implementation("com.google.mediapipe:tasks-vision:0.10.9")
+    implementation("com.google.mediapipe:tasks-vision:0.20230731")
     
     // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
     
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
