@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Validate Gradle wrapper checksum
-        uses: gradle/actions/wrapper-validation@v3
+        uses: gradle/actions/wrapper-validation@v5
 
       - name: Secret scan (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
