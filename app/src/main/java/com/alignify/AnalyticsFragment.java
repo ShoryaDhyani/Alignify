@@ -156,7 +156,7 @@ public class AnalyticsFragment extends Fragment {
         tvCalories = view.findViewById(R.id.tvCalories);
         tvTrainingPercent = view.findViewById(R.id.tvTrainingPercent);
         progressTraining = view.findViewById(R.id.progressTraining);
-//        tvHeartRate = view.findViewById(R.id.tvHeartRate);
+        tvHeartRate = view.findViewById(R.id.tvHeartRate);
         tvSteps = view.findViewById(R.id.tvSteps);
         tvWaterCups = view.findViewById(R.id.tvWaterCups);
         progressWater = view.findViewById(R.id.progressWater);
@@ -176,6 +176,9 @@ public class AnalyticsFragment extends Fragment {
         });
 
         View stepsCard = view.findViewById(R.id.stepsCard);
+        if (stepsCard != null) {
+            stepsCard.setOnClickListener(v -> showStepsBottomSheet());
+        }
     }
 
     private void setupWeekCalendar() {
@@ -267,7 +270,7 @@ public class AnalyticsFragment extends Fragment {
         LinearLayout exerciseBreakdownContainer = sheetView.findViewById(R.id.exerciseBreakdownContainer);
 
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
-        UserRepository.getInstance(requireContext()).getDailyActivity(dateKey, activity -> {
+        UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
             if (!isAdded())
                 return;
             requireActivity().runOnUiThread(() -> {
@@ -313,7 +316,7 @@ public class AnalyticsFragment extends Fragment {
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
-            UserRepository.getInstance(requireContext()).getDailyActivity(dateKeys[i], activity -> {
+            UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
                 try {
                     stepsData[index] = activity != null ? activity.getSteps() : 0;
                 } catch (Exception e) {
@@ -392,7 +395,7 @@ public class AnalyticsFragment extends Fragment {
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
-            UserRepository.getInstance(requireContext()).getDailyActivity(dateKeys[i], activity -> {
+            UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
                 try {
                     minutesData[index] = activity != null ? activity.getActiveMinutes() : 0;
                 } catch (Exception e) {
@@ -520,7 +523,7 @@ public class AnalyticsFragment extends Fragment {
     private void loadDataForDate(Calendar date) {
         String dateKey = DailyActivity.dateKey(date.getTimeInMillis());
 
-        UserRepository.getInstance(requireContext()).getDailyActivity(dateKey, activity -> {
+        UserRepository.getInstance().getDailyActivity(dateKey, activity -> {
             if (!isAdded())
                 return;
             requireActivity().runOnUiThread(() -> {
@@ -576,6 +579,61 @@ public class AnalyticsFragment extends Fragment {
         }
     }
 
+    private void showStepsBottomSheet() {
+        if (!isAdded())
+            return;
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View sheetView = LayoutInflater.from(requireContext()).inflate(R.layout.bottom_sheet_steps, null);
+        bottomSheetDialog.setContentView(sheetView);
+
+        ProgressBar progressSteps = sheetView.findViewById(R.id.progressSteps);
+        TextView tvCurrentSteps = sheetView.findViewById(R.id.tvCurrentSteps);
+        TextView tvGoalSteps = sheetView.findViewById(R.id.tvGoalSteps);
+        TextView tvStepMotivation = sheetView.findViewById(R.id.tvStepMotivation);
+        TextView tvDistance = sheetView.findViewById(R.id.tvDistance);
+        TextView tvStepCalories = sheetView.findViewById(R.id.tvStepCalories);
+        TextView tvActiveTime = sheetView.findViewById(R.id.tvActiveTime);
+
+        int currentSteps = fitnessDataManager.getStepsToday();
+        int goalSteps = fitnessDataManager.getStepGoal();
+
+        if (todayActivity != null && todayActivity.getSteps() > currentSteps) {
+            currentSteps = todayActivity.getSteps();
+        }
+
+        int progressPercent = goalSteps > 0 ? (int) ((currentSteps * 100.0f) / goalSteps) : 0;
+        progressPercent = Math.min(progressPercent, 100);
+
+        tvCurrentSteps.setText(String.valueOf(currentSteps));
+        tvGoalSteps.setText("of " + goalSteps);
+        progressSteps.setMax(100);
+        progressSteps.setProgress(progressPercent);
+
+        float distanceKm = fitnessDataManager.getDistanceToday();
+        int calories = fitnessDataManager.getCaloriesToday();
+        int activeMinutes = fitnessDataManager.getActiveMinutesToday();
+
+        tvDistance.setText(String.format(Locale.US, "%.1f km", distanceKm));
+        tvStepCalories.setText(String.valueOf(calories));
+        tvActiveTime.setText(activeMinutes + " min");
+
+        if (progressPercent >= 100) {
+            tvStepMotivation.setText("Goal achieved! You're a champion!");
+        } else if (progressPercent >= 75) {
+            tvStepMotivation.setText("Almost there! " + (goalSteps - currentSteps) + " steps to go!");
+        } else if (progressPercent >= 50) {
+            tvStepMotivation.setText("Halfway there! Keep moving!");
+        } else if (progressPercent >= 25) {
+            tvStepMotivation.setText("Great start! Keep it up!");
+        } else {
+            tvStepMotivation.setText("Start your day with a walk!");
+        }
+
+        sheetView.findViewById(R.id.btnSetStepGoal).setOnClickListener(v -> bottomSheetDialog.dismiss());
+        sheetView.findViewById(R.id.btnCloseSteps).setOnClickListener(v -> bottomSheetDialog.dismiss());
+
+        bottomSheetDialog.show();
+    }
 
     private boolean isSameDay(Calendar cal1, Calendar cal2) {
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)

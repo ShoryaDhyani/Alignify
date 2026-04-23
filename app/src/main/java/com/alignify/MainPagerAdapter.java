@@ -25,7 +25,7 @@ public class MainPagerAdapter extends FragmentStateAdapter {
             case 1:
                 return new ExercisesFragment();
             case 2:
-                return new DashboardFragment();
+                return new RunFragment();
             case 3:
                 return new AnalyticsFragment();
             case 4:

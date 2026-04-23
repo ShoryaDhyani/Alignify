@@ -212,26 +212,26 @@ public class StepCounterService extends Service implements SensorEventListener {
         // Broadcast step update to UI
         broadcastStepUpdate(stepsToday);
 
-        // Sync to local SQLite periodically (every 100 steps or 5 minutes)
-        syncToLocalIfNeeded(stepsToday);
+        // Sync to Firestore periodically (every 100 steps or 5 minutes)
+        syncToFirestoreIfNeeded(stepsToday);
     }
 
     /**
-     * Syncs step data to local SQLite periodically to avoid excessive writes.
+     * Syncs step data to Firestore periodically to avoid excessive writes.
      * Only syncs steps - FitnessDataManager handles calorie/distance calculation.
      */
-    private void syncToLocalIfNeeded(int steps) {
+    private void syncToFirestoreIfNeeded(int steps) {
         long now = System.currentTimeMillis();
         int stepDelta = steps - lastSyncedSteps;
         long timeDelta = now - lastSyncTime;
 
         if (stepDelta >= SYNC_STEP_THRESHOLD || timeDelta >= SYNC_TIME_THRESHOLD) {
             // Let FitnessDataManager handle sync with calculated calories and distance
-            FitnessDataManager.getInstance(this).syncToLocal();
+            FitnessDataManager.getInstance(this).syncToFirestore();
 
             lastSyncedSteps = steps;
             lastSyncTime = now;
-            Log.d(TAG, "Synced steps to local SQLite: " + steps);
+            Log.d(TAG, "Synced steps to Firestore: " + steps);
         }
     }
 

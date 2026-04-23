@@ -35,8 +35,14 @@ import com.alignify.util.NavigationHelper;
 import com.alignify.util.ProfileImageHelper;
 import com.alignify.util.StepCounterHelper;
 import com.bumptech.glide.Glide;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationView;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 /**
  * Dashboard/Home fragment showing user profile and system status.
@@ -63,6 +69,9 @@ public class DashboardFragment extends Fragment {
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
 
+    private FirebaseAuth firebaseAuth;
+    private GoogleSignInClient googleSignInClient;
+
     // Step counter
     private static final String TAG = "DashboardFragment";
     private FitnessDataManager fitnessDataManager;
@@ -85,22 +94,32 @@ public class DashboardFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Hide the bottom nav bar from the inflated layout
+        // Hide the bottom nav bar from the inflated layout (HomeActivity provides the
+        // nav)
         View bottomNav = view.findViewById(R.id.bottomNavContainer);
         if (bottomNav != null) {
             bottomNav.setVisibility(View.GONE);
         }
 
+        // Initialize Firebase Auth
+        firebaseAuth = FirebaseAuth.getInstance();
+
         // Initialize FitnessDataManager
         fitnessDataManager = FitnessDataManager.getInstance(requireContext());
+
+        // Initialize Google Sign-In client
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .build();
+        googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
         initViews(view);
         loadUserProfile();
         setupListeners(view);
         setupStepCounter(view);
 
-        // Load data from local SQLite
-        fitnessDataManager.loadFromLocal(null);
+        // Load data from Firestore
+        fitnessDataManager.loadFromFirestore(null);
 
         // Check for model updates
         checkForModelUpdates();
@@ -114,7 +133,7 @@ public class DashboardFragment extends Fragment {
         loadUserProfile();
         updateStepCountDisplay();
         registerStepUpdateReceiver();
-        loadTodayActivityFromLocal();
+        loadTodayActivityFromFirestore();
     }
 
     @Override
@@ -126,11 +145,11 @@ public class DashboardFragment extends Fragment {
         syncStepsToManager();
     }
 
-    private void loadTodayActivityFromLocal() {
+    private void loadTodayActivityFromFirestore() {
         int steps = fitnessDataManager.getStepsToday();
         updateStepUI(steps);
 
-        fitnessDataManager.loadFromLocal(() -> {
+        fitnessDataManager.loadFromFirestore(() -> {
             if (isAdded()) {
                 requireActivity().runOnUiThread(() -> {
                     int mergedSteps = fitnessDataManager.getStepsToday();
@@ -192,13 +211,30 @@ public class DashboardFragment extends Fragment {
         TextView navUserName = headerView.findViewById(R.id.navUserName);
         TextView navUserEmail = headerView.findViewById(R.id.navUserEmail);
 
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(requireContext());
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String storedName = prefs.getString(KEY_USER_NAME, "");
-        String displayName = prefs.getString("display_name", storedName);
         String storedEmail = prefs.getString(KEY_USER_EMAIL, "");
+        String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
 
-        navUserName.setText(displayName.isEmpty() ? "Guest User" : displayName);
-        navUserEmail.setText(storedEmail.isEmpty() ? "Guest" : storedEmail);
+        String displayName = "";
+        if (firebaseUser != null && firebaseUser.getDisplayName() != null && !firebaseUser.getDisplayName().isEmpty()) {
+            displayName = firebaseUser.getDisplayName();
+        } else if (googleAccount != null && googleAccount.getDisplayName() != null) {
+            displayName = googleAccount.getDisplayName();
+        } else if (!storedName.isEmpty()) {
+            displayName = storedName;
+        }
+        navUserName.setText(displayName.isEmpty() ? "User" : displayName);
+
+        String email = "";
+        if (firebaseUser != null && firebaseUser.getEmail() != null) {
+            email = firebaseUser.getEmail();
+        } else if (!storedEmail.isEmpty()) {
+            email = storedEmail;
+        }
+        navUserEmail.setText(email);
 
         if (ProfileImageHelper.hasProfileImage(requireContext())) {
             String localPath = ProfileImageHelper.getProfileImagePath(requireContext());
@@ -208,11 +244,23 @@ public class DashboardFragment extends Fragment {
                     .error(R.drawable.ic_profile)
                     .circleCrop()
                     .into(navAvatar);
+        } else if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(cachedProfileImageUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(navAvatar);
         } else {
-            String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
-            if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
+            android.net.Uri photoUrl = null;
+            if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+                photoUrl = googleAccount.getPhotoUrl();
+            } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+                photoUrl = firebaseUser.getPhotoUrl();
+            }
+            if (photoUrl != null) {
                 Glide.with(this)
-                        .load(cachedProfileImageUrl)
+                        .load(photoUrl)
                         .placeholder(R.drawable.ic_profile)
                         .error(R.drawable.ic_profile)
                         .circleCrop()
@@ -293,8 +341,24 @@ public class DashboardFragment extends Fragment {
     private void loadDefaultAccountPhoto() {
         if (!isAdded())
             return;
-        // No Firebase/Google account photos available in offline mode
-        if (ivProfileImage != null) {
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(requireContext());
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+
+        android.net.Uri photoUrl = null;
+        if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+            photoUrl = googleAccount.getPhotoUrl();
+        } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+            photoUrl = firebaseUser.getPhotoUrl();
+        }
+
+        if (photoUrl != null && ivProfileImage != null) {
+            Glide.with(this)
+                    .load(photoUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+        } else if (ivProfileImage != null) {
             ivProfileImage.setImageResource(R.drawable.ic_profile);
         }
     }
@@ -351,9 +415,9 @@ public class DashboardFragment extends Fragment {
         if (!isAdded())
             return;
         new AlertDialog.Builder(requireContext())
-                .setTitle("Reset App")
-                .setMessage("This will clear all your local data and return to initial setup. Continue?")
-                .setPositiveButton("Reset", (dialog, which) -> performLogout())
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Logout", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -361,16 +425,21 @@ public class DashboardFragment extends Fragment {
     private void performLogout() {
         if (!isAdded())
             return;
+        if (firebaseAuth != null) {
+            firebaseAuth.signOut();
+        }
 
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().clear().apply();
+        googleSignInClient.signOut().addOnCompleteListener(requireActivity(), task -> {
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
 
-        Toast.makeText(requireContext(), "Data cleared successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
 
-        Intent intent = new Intent(requireContext(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+        });
     }
 
     // ==================== Step Counter ====================
@@ -441,8 +510,8 @@ public class DashboardFragment extends Fragment {
         if (stepProgressBar != null)
             stepProgressBar.setProgress(0);
 
-        // Sync to local SQLite
-        UserRepository.getInstance(requireContext()).resetTodaySteps(new UserRepository.OnCompleteListener() {
+        // Then sync to Firestore
+        UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
                 if (isAdded()) {

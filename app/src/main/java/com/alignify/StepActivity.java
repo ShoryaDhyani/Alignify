@@ -131,7 +131,7 @@ public class StepActivity extends AppCompatActivity {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Set Daily Step Goal")
                 .setItems(goals, (dialog, which) -> {
-                    // Use FitnessDataManager to set goal (syncs locally)
+                    // Use FitnessDataManager to set goal (syncs to Firestore automatically)
                     int newGoal = goalValues[which];
                     fitnessDataManager.setStepGoal(newGoal);
                     stepProgressCircle.setMax(newGoal);
@@ -179,8 +179,8 @@ public class StepActivity extends AppCompatActivity {
         // Sync to FitnessDataManager
         fitnessDataManager.setStepsToday(localSteps);
 
-        // Load from local SQLite
-        fitnessDataManager.loadFromLocal(() -> {
+        // Then load from Firestore (might have higher count from other devices)
+        fitnessDataManager.loadFromFirestore(() -> {
             runOnUiThread(() -> {
                 int mergedSteps = fitnessDataManager.getStepsToday();
                 if (mergedSteps > localSteps) {

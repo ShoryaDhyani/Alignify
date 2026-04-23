@@ -23,6 +23,11 @@ import androidx.core.content.ContextCompat;
 
 import com.alignify.data.UserRepository;
 import com.bumptech.glide.Glide;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserProfileChangeRequest;
 
 /**
  * Enhanced profile editing screen with photo upload,
@@ -65,6 +70,8 @@ public class EditProfileActivity extends AppCompatActivity {
     private String selectedActivityLevel = "";
     private String selectedFitnessGoal = "";
     private Uri selectedPhotoUri = null;
+
+    private FirebaseAuth firebaseAuth;
 
     // Gender options
     private final String[] genderOptions = { "Male", "Female", "Other", "Prefer not to say" };
@@ -138,6 +145,8 @@ public class EditProfileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_profile);
 
+        firebaseAuth = FirebaseAuth.getInstance();
+
         initViews();
         loadExistingProfile();
         setupListeners();
@@ -165,15 +174,31 @@ public class EditProfileActivity extends AppCompatActivity {
     private void loadExistingProfile() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // Load display name from prefs
-        String displayName = prefs.getString(KEY_DISPLAY_NAME, "");
-        etDisplayName.setText(displayName);
+        // Load display name from Firebase or prefs
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        if (user != null && user.getDisplayName() != null) {
+            etDisplayName.setText(user.getDisplayName());
+        } else {
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+            if (account != null && account.getDisplayName() != null) {
+                etDisplayName.setText(account.getDisplayName());
+            } else {
+                etDisplayName.setText(prefs.getString(KEY_DISPLAY_NAME, ""));
+            }
+        }
 
         // Load profile photo
         String photoUriString = prefs.getString(KEY_PROFILE_PHOTO_URI, null);
         if (photoUriString != null) {
             selectedPhotoUri = Uri.parse(photoUriString);
             loadProfilePhoto(selectedPhotoUri);
+        } else if (user != null && user.getPhotoUrl() != null) {
+            loadProfilePhoto(user.getPhotoUrl());
+        } else {
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+            if (account != null && account.getPhotoUrl() != null) {
+                loadProfilePhoto(account.getPhotoUrl());
+            }
         }
 
         // Load body measurements
@@ -600,9 +625,18 @@ public class EditProfileActivity extends AppCompatActivity {
 
         editor.apply();
 
-        // Save to local SQLite
+        // Update Firebase display name if user is signed in
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        if (user != null) {
+            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                    .setDisplayName(displayName)
+                    .build();
+            user.updateProfile(profileUpdates);
+        }
+
+        // Save to Firestore
         String email = prefs.getString("user_email", "");
-        UserRepository.getInstance(this).saveUserProfile(
+        UserRepository.getInstance().saveUserProfile(
                 email, displayName, bmi, bmiCategory,
                 selectedActivityLevel.isEmpty() ? "Not specified" : selectedActivityLevel,
                 (int) height, (int) weight, age,

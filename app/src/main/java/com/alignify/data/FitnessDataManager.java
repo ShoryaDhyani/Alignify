@@ -27,11 +27,13 @@ import java.util.concurrent.Executors;
  * - Sleep tracking
  * - Exercise reps
  * 
- * Data is cached locally in SharedPreferences for speed and persisted to
- * local SQLite (Room) for long-term storage.
+ * Data is cached locally in SharedPreferences for speed and synced to Firebase
+ * Firestore
+ * for persistence across devices.
  * 
  * All activities should use this manager instead of directly accessing
- * SharedPreferences or Room to ensure data consistency.
+ * SharedPreferences
+ * or Firestore to ensure data consistency.
  */
 public class FitnessDataManager {
 
@@ -170,7 +172,7 @@ public class FitnessDataManager {
      * Called periodically to keep only recent data.
      */
     public void cleanupOldData() {
-        UserRepository.getInstance(context).deleteOldActivities(30, result -> {
+        UserRepository.getInstance().deleteOldActivities(30, result -> {
             if (result) {
                 Log.d(TAG, "Successfully cleaned up data older than 30 days");
             } else {
@@ -226,7 +228,7 @@ public class FitnessDataManager {
 
             // THEN sync yesterday's snapshot (date already updated, no re-entrancy)
             if (!lastDate.isEmpty()) {
-                UserRepository.getInstance(context).saveDailyActivity(yesterday, null);
+                UserRepository.getInstance().saveDailyActivity(yesterday, null);
             }
         }
     }
@@ -295,7 +297,7 @@ public class FitnessDataManager {
      */
     public void setStepGoal(int goal) {
         prefs.edit().putInt(KEY_STEP_GOAL, goal).apply();
-        syncGoalsToLocal();
+        syncGoalsToFirestore();
     }
 
     /**
@@ -352,7 +354,7 @@ public class FitnessDataManager {
      */
     public void setCaloriesGoal(int goal) {
         prefs.edit().putInt(KEY_CALORIES_GOAL, goal).apply();
-        syncGoalsToLocal();
+        syncGoalsToFirestore();
     }
 
     /**
@@ -426,7 +428,7 @@ public class FitnessDataManager {
      */
     public void setActiveTimeGoal(int goal) {
         prefs.edit().putInt(KEY_ACTIVE_TIME_GOAL, goal).apply();
-        syncGoalsToLocal();
+        syncGoalsToFirestore();
     }
 
     /**
@@ -497,7 +499,7 @@ public class FitnessDataManager {
      */
     public void setWaterGoal(int goal) {
         prefs.edit().putInt(KEY_WATER_GOAL, Math.max(1, goal)).apply();
-        syncGoalsToLocal();
+        syncGoalsToFirestore();
     }
 
     /**
@@ -560,7 +562,7 @@ public class FitnessDataManager {
      */
     public void setSleepGoal(float goal) {
         prefs.edit().putFloat(KEY_SLEEP_GOAL, goal).apply();
-        syncGoalsToLocal();
+        syncGoalsToFirestore();
     }
 
     // ============ Exercise Tracking ============
@@ -663,8 +665,8 @@ public class FitnessDataManager {
         // Add calories
         addCalories(caloriesBurned);
 
-        // Sync to local SQLite
-        syncToLocal();
+        // Sync to Firestore
+        syncToFirestore();
     }
 
     /**
@@ -711,7 +713,7 @@ public class FitnessDataManager {
         return steps * 0.0007f;
     }
 
-    // ============ Local SQLite Sync ============
+    // ============ Firestore Sync ============
 
     /**
      * Schedule sync if enough time has passed since last sync.
@@ -719,21 +721,21 @@ public class FitnessDataManager {
     private void scheduleSyncIfNeeded() {
         long now = System.currentTimeMillis();
         if (now - lastSyncTime > SYNC_INTERVAL_MS) {
-            syncToLocal();
+            syncToFirestore();
         }
     }
 
     /**
-     * Sync current day's data to local SQLite.
+     * Sync current day's data to Firestore.
      */
-    public void syncToLocal() {
-        syncToLocal(getTodayDateString());
+    public void syncToFirestore() {
+        syncToFirestore(getTodayDateString());
     }
 
     /**
-     * Sync data for a specific date to local SQLite.
+     * Sync data for a specific date to Firestore.
      */
-    private void syncToLocal(String dateKey) {
+    private void syncToFirestore(String dateKey) {
         long now = System.currentTimeMillis();
         if (isSyncing && (now - lastSyncTime) < 30000)
             return; // Allow retry after 30s timeout
@@ -756,26 +758,26 @@ public class FitnessDataManager {
         activity.setWorkoutsCount(getWorkoutsCountToday());
         activity.setTotalWorkoutDuration(getTotalWorkoutDurationToday());
 
-        UserRepository.getInstance(context).saveDailyActivity(activity, new UserRepository.OnCompleteListener() {
+        UserRepository.getInstance().saveDailyActivity(activity, new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
-                Log.d(TAG, "Data synced to SQLite: " + dateKey);
+                Log.d(TAG, "Data synced to Firestore: " + dateKey);
                 isSyncing = false;
             }
 
             @Override
             public void onError(String error) {
-                Log.e(TAG, "Failed to sync to SQLite: " + error);
+                Log.e(TAG, "Failed to sync to Firestore: " + error);
                 isSyncing = false;
             }
         });
     }
 
     /**
-     * Sync goals to local SQLite.
+     * Sync goals to Firestore.
      */
-    private void syncGoalsToLocal() {
-        UserRepository.getInstance(context).saveGoals(
+    private void syncGoalsToFirestore() {
+        UserRepository.getInstance().saveGoals(
                 getStepGoal(),
                 getCaloriesGoal(),
                 getActiveTimeGoal(),
@@ -785,27 +787,30 @@ public class FitnessDataManager {
     }
 
     /**
-     * Load data from local SQLite (useful when app starts).
+     * Load data from Firestore (useful when app starts or user logs in).
      */
-    public void loadFromLocal(OnDataLoadedListener listener) {
-        UserRepository.getInstance(context).getTodayActivity(activity -> {
+    public void loadFromFirestore(OnDataLoadedListener listener) {
+        UserRepository.getInstance().getTodayActivity(activity -> {
             if (activity != null) {
                 // Merge with local data - take the higher values
                 int localSteps = getStepsToday();
-                int dbSteps = activity.getSteps();
+                int firestoreSteps = activity.getSteps();
 
-                if (dbSteps > localSteps) {
+                if (firestoreSteps > localSteps) {
                     prefs.edit()
-                            .putInt(KEY_STEPS_TODAY, dbSteps)
+                            .putInt(KEY_STEPS_TODAY, firestoreSteps)
                             .putInt(KEY_CALORIES_TODAY, activity.getCalories())
                             .putFloat(KEY_DISTANCE_TODAY, activity.getDistance())
                             .apply();
-                    stepsLiveData.postValue(dbSteps);
+                    stepsLiveData.postValue(firestoreSteps);
                     caloriesLiveData.postValue(activity.getCalories());
                     distanceLiveData.postValue(activity.getDistance());
+                } else if (firestoreSteps == 0 && localSteps > 0) {
+                    // If Firestore shows 0 but local has data, sync the local data to Firestore
+                    syncToFirestore();
                 }
 
-                // For other metrics, take DB values if local is 0
+                // For other metrics, take Firestore values if local is 0
                 if (getActiveMinutesToday() == 0 && activity.getActiveMinutes() > 0) {
                     setActiveMinutesToday(activity.getActiveMinutes());
                 }
@@ -813,9 +818,9 @@ public class FitnessDataManager {
                     setWaterCupsToday(activity.getWaterCups());
                 }
 
-                // Refresh LiveData to ensure UI shows updated data
+                // Refresh LiveData to ensure UI shows updated data after any changes
                 loadInitialData();
-                Log.d(TAG, "Loaded and merged data from SQLite");
+                Log.d(TAG, "Loaded and merged data from Firestore");
             }
 
             if (listener != null) {
@@ -824,7 +829,7 @@ public class FitnessDataManager {
         });
 
         // Also load goals
-        UserRepository.getInstance(context).loadGoals(goals -> {
+        UserRepository.getInstance().loadGoals(goals -> {
             if (goals != null) {
                 if (goals.containsKey("stepGoal")) {
                     int stepGoal = ((Number) goals.get("stepGoal")).intValue();
@@ -856,7 +861,7 @@ public class FitnessDataManager {
                         prefs.edit().putFloat(KEY_SLEEP_GOAL, sleepGoal).apply();
                     }
                 }
-                Log.d(TAG, "Loaded goals from SQLite");
+                Log.d(TAG, "Loaded goals from Firestore");
             }
         });
     }

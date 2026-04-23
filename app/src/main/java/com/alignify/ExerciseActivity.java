@@ -779,7 +779,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     }
 
     /**
-     * Saves the completed workout session to local SQLite.
+     * Saves the completed workout session to Firestore.
      */
     private void saveWorkoutSession() {
         if (sessionStartTime == 0)
@@ -798,7 +798,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 .getCaloriesFromExercise(exerciseType, durationSeconds);
 
         // Save to workout history
-        UserRepository.getInstance(this).saveWorkoutSession(
+        UserRepository.getInstance().saveWorkoutSession(
                 exerciseType,
                 repCount,
                 durationSeconds,
@@ -806,7 +806,7 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
                 null);
 
         // Also update daily activity aggregates
-        UserRepository.getInstance(this).recordWorkoutToDaily(durationSeconds, caloriesEstimate);
+        UserRepository.getInstance().recordWorkoutToDaily(durationSeconds, caloriesEstimate);
 
         Log.d(TAG, "Workout saved: " + exerciseType + ", reps=" + repCount + ", duration=" + durationSeconds + "s");
     }

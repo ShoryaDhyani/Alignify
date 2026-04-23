@@ -24,7 +24,13 @@ import com.alignify.data.FitnessDataManager;
 import com.alignify.engine.CaloriesEngine;
 import com.alignify.service.WaterReminderService;
 import com.bumptech.glide.Glide;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -59,6 +65,9 @@ public class ProfileFragment extends Fragment {
     private int waterGoal = 8;
     private boolean useKilometers = true;
 
+    private FirebaseAuth firebaseAuth;
+    private GoogleSignInClient googleSignInClient;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -83,6 +92,12 @@ public class ProfileFragment extends Fragment {
         }
 
         fitnessDataManager = FitnessDataManager.getInstance(requireContext());
+
+        firebaseAuth = FirebaseAuth.getInstance();
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .build();
+        googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso);
 
         initViews(view);
         loadSettings();
@@ -153,24 +168,53 @@ public class ProfileFragment extends Fragment {
         if (savedDisplayName != null && !savedDisplayName.isEmpty()) {
             tvUserName.setText(savedDisplayName);
         } else {
-            String userName = prefs.getString("user_name", "Guest User");
-            tvUserName.setText(userName);
+            FirebaseUser user = firebaseAuth.getCurrentUser();
+            if (user != null && user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
+                tvUserName.setText(user.getDisplayName());
+            } else {
+                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
+                if (account != null && account.getDisplayName() != null) {
+                    tvUserName.setText(account.getDisplayName());
+                } else {
+                    tvUserName.setText("User");
+                }
+            }
         }
 
-        String email = prefs.getString("user_email", "");
-        if (email != null && !email.isEmpty()) {
-            tvUserEmail.setText(email);
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        if (user != null && user.getEmail() != null) {
+            tvUserEmail.setText(user.getEmail());
         } else {
-            tvUserEmail.setText("Guest");
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
+            if (account != null && account.getEmail() != null) {
+                tvUserEmail.setText(account.getEmail());
+            }
         }
 
         if (savedPhotoUri != null) {
             Glide.with(this)
-                    .load(android.net.Uri.parse(savedPhotoUri))
+                    .load(Uri.parse(savedPhotoUri))
                     .placeholder(R.drawable.default_profile)
                     .error(R.drawable.default_profile)
                     .circleCrop()
                     .into(ivProfileImage);
+        } else if (user != null && user.getPhotoUrl() != null) {
+            Glide.with(this)
+                    .load(user.getPhotoUrl())
+                    .placeholder(R.drawable.default_profile)
+                    .error(R.drawable.default_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+        } else {
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(requireContext());
+            if (account != null && account.getPhotoUrl() != null) {
+                Glide.with(this)
+                        .load(account.getPhotoUrl())
+                        .placeholder(R.drawable.default_profile)
+                        .error(R.drawable.default_profile)
+                        .circleCrop()
+                        .into(ivProfileImage);
+            }
         }
     }
 
@@ -440,9 +484,9 @@ public class ProfileFragment extends Fragment {
         if (!isAdded())
             return;
         new AlertDialog.Builder(requireContext())
-                .setTitle("Reset App")
-                .setMessage("This will clear all your local data and return to initial setup. Continue?")
-                .setPositiveButton("Reset", (dialog, which) -> performLogout())
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Logout", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -450,16 +494,23 @@ public class ProfileFragment extends Fragment {
     private void performLogout() {
         if (!isAdded())
             return;
+        if (firebaseAuth != null) {
+            firebaseAuth.signOut();
+        }
 
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().clear().apply();
+        googleSignInClient.signOut().addOnCompleteListener(requireActivity(), task -> {
+            if (!isAdded())
+                return;
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
 
-        Toast.makeText(requireContext(), "Data cleared successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
 
-        Intent intent = new Intent(requireContext(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+        });
     }
 
     private int dpToPx(int dp) {

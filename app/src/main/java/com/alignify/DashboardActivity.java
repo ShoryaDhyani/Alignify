@@ -39,6 +39,12 @@ import com.alignify.data.UserRepository;
 import com.alignify.util.ProfileImageHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 /**
  * Dashboard/Home screen showing user profile and system status.
@@ -71,6 +77,9 @@ public class DashboardActivity extends AppCompatActivity {
     private View navAnalytics;
     private View navProfile;
 
+    private FirebaseAuth firebaseAuth;
+    private GoogleSignInClient googleSignInClient;
+
     // Step counter
     private static final String TAG = "DashboardActivity";
     private FitnessDataManager fitnessDataManager;
@@ -90,17 +99,27 @@ public class DashboardActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard_new);
 
+        // Initialize Firebase Auth
+        firebaseAuth = FirebaseAuth.getInstance();
+
         // Initialize FitnessDataManager (single source of truth for fitness data)
         fitnessDataManager = FitnessDataManager.getInstance(this);
 
+        // Initialize Google Sign-In client for logout
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .build();
+        googleSignInClient = GoogleSignIn.getClient(this, gso);
+
         initViews();
         loadUserProfile();
+        setupListeners();
 
         // Setup step counter
         setupStepCounter();
 
-        // Load data from local SQLite
-        fitnessDataManager.loadFromLocal(null);
+        // Load data from Firestore and sync with local
+        fitnessDataManager.loadFromFirestore(null);
 
         // Check for model updates
         checkForModelUpdates();
@@ -152,8 +171,8 @@ public class DashboardActivity extends AppCompatActivity {
         // Register step update receiver
         registerStepUpdateReceiver();
 
-        // Load today's activity from local SQLite
-        loadTodayActivityFromLocal();
+        // Load today's activity from Firestore
+        loadTodayActivityFromFirestore();
         
         // Force a sync with connected wearables when viewing the dashboard
         fitnessDataManager.syncWithWearable();
@@ -173,11 +192,13 @@ public class DashboardActivity extends AppCompatActivity {
     /**
      * Loads today's activity data from FitnessDataManager.
      */
-    private void loadTodayActivityFromLocal() {
+    private void loadTodayActivityFromFirestore() {
+        // Use FitnessDataManager which handles local cache + Firestore sync
         int steps = fitnessDataManager.getStepsToday();
         updateStepUI(steps);
 
-        fitnessDataManager.loadFromLocal(() -> {
+        // Also load from Firestore to merge any remote data
+        fitnessDataManager.loadFromFirestore(() -> {
             runOnUiThread(() -> {
                 int mergedSteps = fitnessDataManager.getStepsToday();
                 updateStepUI(mergedSteps);
@@ -246,14 +267,41 @@ public class DashboardActivity extends AppCompatActivity {
         TextView navUserName = headerView.findViewById(R.id.navUserName);
         TextView navUserEmail = headerView.findViewById(R.id.navUserEmail);
 
+        // Get current Firebase user
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+
+        // Get Google Sign-In account for photo URL
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+
+        // Get user info from SharedPreferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String storedName = prefs.getString(KEY_USER_NAME, "");
-        String displayName = prefs.getString("display_name", storedName);
         String storedEmail = prefs.getString(KEY_USER_EMAIL, "");
+        String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
 
-        navUserName.setText(displayName.isEmpty() ? "Guest User" : displayName);
-        navUserEmail.setText(storedEmail.isEmpty() ? "Guest" : storedEmail);
+        // Set user name - prioritize Firebase, then Google, then stored prefs
+        String displayName = "";
+        if (firebaseUser != null && firebaseUser.getDisplayName() != null && !firebaseUser.getDisplayName().isEmpty()) {
+            displayName = firebaseUser.getDisplayName();
+        } else if (googleAccount != null && googleAccount.getDisplayName() != null) {
+            displayName = googleAccount.getDisplayName();
+        } else if (!storedName.isEmpty()) {
+            displayName = storedName;
+        }
+        navUserName.setText(displayName.isEmpty() ? "User" : displayName);
 
+        // Set email - prioritize Firebase, then stored
+        String email = "";
+        if (firebaseUser != null && firebaseUser.getEmail() != null) {
+            email = firebaseUser.getEmail();
+        } else if (!storedEmail.isEmpty()) {
+            email = storedEmail;
+        }
+        navUserEmail.setText(email);
+
+        // Load profile photo - prioritize local storage, then cached URL, then
+        // Google/Firebase
+        // account photos
         if (ProfileImageHelper.hasProfileImage(this)) {
             String localPath = ProfileImageHelper.getProfileImagePath(this);
             Glide.with(this)
@@ -262,11 +310,24 @@ public class DashboardActivity extends AppCompatActivity {
                     .error(R.drawable.ic_profile)
                     .circleCrop()
                     .into(navAvatar);
+        } else if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(cachedProfileImageUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(navAvatar);
         } else {
-            String cachedProfileImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
-            if (cachedProfileImageUrl != null && !cachedProfileImageUrl.isEmpty()) {
+            android.net.Uri photoUrl = null;
+            if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+                photoUrl = googleAccount.getPhotoUrl();
+            } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+                photoUrl = firebaseUser.getPhotoUrl();
+            }
+
+            if (photoUrl != null) {
                 Glide.with(this)
-                        .load(cachedProfileImageUrl)
+                        .load(photoUrl)
                         .placeholder(R.drawable.ic_profile)
                         .error(R.drawable.ic_profile)
                         .circleCrop()
@@ -346,12 +407,37 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void loadDefaultAccountPhoto() {
-        // No Firebase/Google account photos in offline mode
-        if (ivProfileImage != null) {
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+
+        android.net.Uri photoUrl = null;
+        if (googleAccount != null && googleAccount.getPhotoUrl() != null) {
+            photoUrl = googleAccount.getPhotoUrl();
+        } else if (firebaseUser != null && firebaseUser.getPhotoUrl() != null) {
+            photoUrl = firebaseUser.getPhotoUrl();
+        }
+
+        if (photoUrl != null && ivProfileImage != null) {
+            Glide.with(this)
+                    .load(photoUrl)
+                    .placeholder(R.drawable.ic_profile)
+                    .error(R.drawable.ic_profile)
+                    .circleCrop()
+                    .into(ivProfileImage);
+        } else if (ivProfileImage != null) {
             ivProfileImage.setImageResource(R.drawable.ic_profile);
         }
     }
 
+    private void setupListeners() {
+        btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
+
+        // Start Running quick action
+        View btnStartRunning = findViewById(R.id.btnStartRunning);
+        if (btnStartRunning != null) {
+            btnStartRunning.setOnClickListener(v -> startActivity(new Intent(this, RunActivity.class)));
+        }
+    }
 
     private boolean onNavigationItemSelected(MenuItem item) {
         drawerLayout.closeDrawers();
@@ -390,23 +476,33 @@ public class DashboardActivity extends AppCompatActivity {
 
     private void showLogoutConfirmation() {
         new AlertDialog.Builder(this)
-                .setTitle("Reset App")
-                .setMessage("This will clear all your local data and return to initial setup. Continue?")
-                .setPositiveButton("Reset", (dialog, which) -> performLogout())
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Logout", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void performLogout() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().clear().apply();
+        // Sign out from Firebase Auth
+        if (firebaseAuth != null) {
+            firebaseAuth.signOut();
+        }
 
-        Toast.makeText(this, "Data cleared successfully", Toast.LENGTH_SHORT).show();
+        // Sign out from Google
+        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
+            // Clear SharedPreferences
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().clear().apply();
 
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
+            Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
+
+            // Navigate to login
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+        });
     }
 
     private void navigateToExerciseSelection() {
@@ -492,8 +588,8 @@ public class DashboardActivity extends AppCompatActivity {
             stepProgressBar.setProgress(0);
         }
 
-        // Sync to local SQLite
-        UserRepository.getInstance(this).resetTodaySteps(new UserRepository.OnCompleteListener() {
+        // Then sync to Firestore
+        UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
                 runOnUiThread(() -> {

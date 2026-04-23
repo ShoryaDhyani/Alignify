@@ -1,151 +1,167 @@
 package com.alignify.data;
 
-import android.content.Context;
 import android.util.Log;
 
-import com.alignify.data.sleep.AppDatabase;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
- * Repository class for handling user data operations with local Room SQLite database.
- * Replaces the previous Firebase Firestore implementation.
+ * Repository class for handling user data operations with Firebase Firestore.
  */
 public class UserRepository {
 
     private static final String TAG = "UserRepository";
+    private static final String COLLECTION_USERS = "users";
 
-    private final AppDatabase db;
-    private final ExecutorService executor;
+    private final FirebaseFirestore db;
+    private final FirebaseAuth auth;
 
     private static UserRepository instance;
 
-    public static synchronized UserRepository getInstance(Context context) {
-        if (instance == null) {
-            instance = new UserRepository(context.getApplicationContext());
-        }
-        return instance;
-    }
-
-    /**
-     * @deprecated Use getInstance(Context) instead.
-     */
-    @Deprecated
     public static synchronized UserRepository getInstance() {
         if (instance == null) {
-            throw new IllegalStateException("UserRepository not initialized. Call getInstance(Context) first.");
+            instance = new UserRepository();
         }
         return instance;
     }
 
-    private UserRepository(Context context) {
-        db = AppDatabase.getInstance(context);
-        executor = Executors.newSingleThreadExecutor();
+    private UserRepository() {
+        db = FirebaseFirestore.getInstance();
+        auth = FirebaseAuth.getInstance();
     }
 
     /**
-     * Save user profile data to local SQLite.
+     * Get the current user's document reference.
+     */
+    private DocumentReference getUserDocument() {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null) {
+            return db.collection(COLLECTION_USERS).document(user.getUid());
+        }
+        return null;
+    }
+
+    /**
+     * Save user profile data to Firestore.
      */
     public void saveUserProfile(String email, String name, float bmi, String bmiCategory,
             String activityLevel, int height, int weight, int age,
             String gender, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                UserProfileEntity profile = db.userProfileDao().getProfile();
-                if (profile == null) {
-                    profile = new UserProfileEntity();
-                    profile.createdAt = System.currentTimeMillis();
-                }
-                profile.email = email;
-                profile.name = name;
-                profile.bmi = bmi;
-                profile.bmiCategory = bmiCategory;
-                profile.activityLevel = activityLevel;
-                profile.height = height;
-                profile.weight = weight;
-                profile.age = age;
-                profile.gender = gender;
-                profile.profileComplete = true;
-                profile.updatedAt = System.currentTimeMillis();
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
 
-                db.userProfileDao().insertOrUpdate(profile);
-                Log.d(TAG, "Profile saved successfully");
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving profile", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("email", email);
+        profile.put("name", name);
+        profile.put("bmi", bmi);
+        profile.put("bmiCategory", bmiCategory);
+        profile.put("activityLevel", activityLevel);
+        profile.put("height", height);
+        profile.put("weight", weight);
+        profile.put("age", age);
+        profile.put("gender", gender);
+        profile.put("profileComplete", true);
+        profile.put("updatedAt", System.currentTimeMillis());
+
+        userDoc.set(profile, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Profile saved successfully");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving profile", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
-     * Save feedback settings.
+     * Save feedback settings to Firestore.
      */
     public void saveFeedbackSettings(boolean voiceFeedback, boolean textFeedback) {
-        executor.execute(() -> {
-            try {
-                db.userProfileDao().updateFeedbackSettings(voiceFeedback, textFeedback);
-                Log.d(TAG, "Settings saved");
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving settings", e);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("voiceFeedback", voiceFeedback);
+        settings.put("textFeedback", textFeedback);
+
+        userDoc.update(settings)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Settings saved"))
+                .addOnFailureListener(e -> Log.e(TAG, "Error saving settings", e));
     }
 
     /**
-     * Update user's profile image URL.
+     * Update user's profile image URL in Firestore.
      */
     public void updateProfileImageUrl(String imageUrl, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                db.userProfileDao().updateProfileImageUrl(imageUrl, System.currentTimeMillis());
-                Log.d(TAG, "Profile image URL updated");
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating profile image URL", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        Map<String, Object> update = new HashMap<>();
+        update.put("profileImageUrl", imageUrl);
+        update.put("updatedAt", System.currentTimeMillis());
+
+        userDoc.update(update)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Profile image URL updated");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating profile image URL", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
-     * Load user profile.
+     * Load user profile from Firestore.
      */
     public void loadUserProfile(OnProfileLoadedListener listener) {
-        executor.execute(() -> {
-            try {
-                UserProfileEntity profile = db.userProfileDao().getProfile();
-                if (profile != null) {
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("email", profile.email);
-                    data.put("name", profile.name);
-                    data.put("bmi", (double) profile.bmi);
-                    data.put("bmiCategory", profile.bmiCategory);
-                    data.put("activityLevel", profile.activityLevel);
-                    data.put("height", profile.height);
-                    data.put("weight", profile.weight);
-                    data.put("age", profile.age);
-                    data.put("gender", profile.gender);
-                    data.put("profileImageUrl", profile.profileImageUrl);
-                    data.put("profileComplete", profile.profileComplete);
-                    if (listener != null) listener.onProfileLoaded(data);
-                } else {
-                    if (listener != null) listener.onProfileLoaded(null);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading profile", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        userDoc.get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists()) {
+                        Map<String, Object> data = document.getData();
+                        if (listener != null)
+                            listener.onProfileLoaded(data);
+                    } else {
+                        if (listener != null)
+                            listener.onProfileLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading profile", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
@@ -153,103 +169,154 @@ public class UserRepository {
      */
     public void saveWorkoutSession(String exercise, int reps, int duration,
             int errorsCount, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                WorkoutSessionEntity session = new WorkoutSessionEntity();
-                session.exercise = exercise;
-                session.reps = reps;
-                session.duration = duration;
-                session.errorsCount = errorsCount;
-                session.timestamp = System.currentTimeMillis();
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
 
-                long id = db.workoutSessionDao().insert(session);
-                Log.d(TAG, "Workout saved: " + id);
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving workout", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        Map<String, Object> workout = new HashMap<>();
+        workout.put("exercise", exercise);
+        workout.put("reps", reps);
+        workout.put("duration", duration);
+        workout.put("errorsCount", errorsCount);
+        workout.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection("workouts")
+                .add(workout)
+                .addOnSuccessListener(docRef -> {
+                    Log.d(TAG, "Workout saved: " + docRef.getId());
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving workout", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     // ============ Goals Methods ============
 
     /**
-     * Save user's fitness goals.
+     * Save user's fitness goals to Firestore.
      */
     public void saveGoals(int stepGoal, int caloriesGoal, int activeTimeGoal,
             int waterGoal, float sleepGoal, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                // Ensure profile exists first
-                UserProfileEntity profile = db.userProfileDao().getProfile();
-                if (profile == null) {
-                    profile = new UserProfileEntity();
-                    profile.createdAt = System.currentTimeMillis();
-                }
-                profile.stepGoal = stepGoal;
-                profile.caloriesGoal = caloriesGoal;
-                profile.activeTimeGoal = activeTimeGoal;
-                profile.waterGoal = waterGoal;
-                profile.sleepGoal = sleepGoal;
-                profile.updatedAt = System.currentTimeMillis();
-                db.userProfileDao().insertOrUpdate(profile);
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
 
-                Log.d(TAG, "Goals saved successfully");
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving goals", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        Map<String, Object> goals = new HashMap<>();
+        goals.put("stepGoal", stepGoal);
+        goals.put("caloriesGoal", caloriesGoal);
+        goals.put("activeTimeGoal", activeTimeGoal);
+        goals.put("waterGoal", waterGoal);
+        goals.put("sleepGoal", sleepGoal);
+        goals.put("updatedAt", System.currentTimeMillis());
+
+        userDoc.update(goals)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Goals saved successfully");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    // Document might not exist, try set with merge
+                    userDoc.set(goals, SetOptions.merge())
+                            .addOnSuccessListener(aVoid2 -> {
+                                Log.d(TAG, "Goals saved (merged)");
+                                if (listener != null)
+                                    listener.onSuccess();
+                            })
+                            .addOnFailureListener(e2 -> {
+                                Log.e(TAG, "Error saving goals", e2);
+                                if (listener != null)
+                                    listener.onError(e2.getMessage());
+                            });
+                });
     }
 
     /**
-     * Load user's fitness goals.
+     * Load user's fitness goals from Firestore.
      */
     public void loadGoals(OnGoalsLoadedListener listener) {
-        executor.execute(() -> {
-            try {
-                UserProfileEntity profile = db.userProfileDao().getProfile();
-                if (profile != null) {
-                    Map<String, Object> goals = new HashMap<>();
-                    if (profile.stepGoal > 0) goals.put("stepGoal", profile.stepGoal);
-                    if (profile.caloriesGoal > 0) goals.put("caloriesGoal", profile.caloriesGoal);
-                    if (profile.activeTimeGoal > 0) goals.put("activeTimeGoal", profile.activeTimeGoal);
-                    if (profile.waterGoal > 0) goals.put("waterGoal", profile.waterGoal);
-                    if (profile.sleepGoal > 0) goals.put("sleepGoal", profile.sleepGoal);
-                    if (listener != null) listener.onGoalsLoaded(goals.isEmpty() ? null : goals);
-                } else {
-                    if (listener != null) listener.onGoalsLoaded(null);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading goals", e);
-                if (listener != null) listener.onGoalsLoaded(null);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onGoalsLoaded(null);
+            return;
+        }
+
+        userDoc.get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists()) {
+                        Map<String, Object> goals = new HashMap<>();
+                        if (document.contains("stepGoal")) {
+                            goals.put("stepGoal", document.get("stepGoal"));
+                        }
+                        if (document.contains("caloriesGoal")) {
+                            goals.put("caloriesGoal", document.get("caloriesGoal"));
+                        }
+                        if (document.contains("activeTimeGoal")) {
+                            goals.put("activeTimeGoal", document.get("activeTimeGoal"));
+                        }
+                        if (document.contains("waterGoal")) {
+                            goals.put("waterGoal", document.get("waterGoal"));
+                        }
+                        if (document.contains("sleepGoal")) {
+                            goals.put("sleepGoal", document.get("sleepGoal"));
+                        }
+                        if (listener != null)
+                            listener.onGoalsLoaded(goals);
+                    } else {
+                        if (listener != null)
+                            listener.onGoalsLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading goals", e);
+                    if (listener != null)
+                        listener.onGoalsLoaded(null);
+                });
     }
 
     // ============ Daily Activity Methods ============
+
+    private static final String COLLECTION_DAILY_ACTIVITY = "dailyActivity";
 
     /**
      * Save or update daily activity data (upsert).
      */
     public void saveDailyActivity(DailyActivity activity, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                DailyActivityEntity entity = DailyActivityEntity.fromDailyActivity(activity);
-                db.dailyActivityDao().insertOrUpdate(entity);
-                Log.d(TAG, "Daily activity saved: " + activity.getDate());
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving daily activity", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(activity.getDate())
+                .set(activity.toMap(), SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Daily activity saved: " + activity.getDate());
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving daily activity", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
-     * Get today's activity.
+     * Get today's activity (cache-first for speed).
      */
     public void getTodayActivity(OnDailyActivityListener listener) {
         getDailyActivity(DailyActivity.todayKey(), listener);
@@ -259,267 +326,374 @@ public class UserRepository {
      * Get activity for a specific date.
      */
     public void getDailyActivity(String date, OnDailyActivityListener listener) {
-        executor.execute(() -> {
-            try {
-                DailyActivityEntity entity = db.dailyActivityDao().getByDate(date);
-                if (entity != null) {
-                    if (listener != null) listener.onActivityLoaded(entity.toDailyActivity());
-                } else {
-                    if (listener != null) listener.onActivityLoaded(null);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading daily activity", e);
-                if (listener != null) listener.onActivityLoaded(null);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onActivityLoaded(null);
+            return;
+        }
+
+        // Try cache first for speed
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(date)
+                .get(com.google.firebase.firestore.Source.CACHE)
+                .addOnSuccessListener(document -> {
+                    if (document.exists() && document.getData() != null) {
+                        DailyActivity activity = DailyActivity.fromMap(document.getData());
+                        if (listener != null)
+                            listener.onActivityLoaded(activity);
+                    } else {
+                        // Fallback to server
+                        fetchFromServer(userDoc, date, listener);
+                    }
+                })
+                .addOnFailureListener(e -> fetchFromServer(userDoc, date, listener));
+    }
+
+    private void fetchFromServer(DocumentReference userDoc, String date, OnDailyActivityListener listener) {
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(date)
+                .get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists() && document.getData() != null) {
+                        DailyActivity activity = DailyActivity.fromMap(document.getData());
+                        if (listener != null)
+                            listener.onActivityLoaded(activity);
+                    } else {
+                        if (listener != null)
+                            listener.onActivityLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading daily activity", e);
+                    if (listener != null)
+                        listener.onActivityLoaded(null);
+                });
     }
 
     /**
-     * Get last N days of activity for charts.
+     * Get last N days of activity for charts (optimized batch fetch).
      */
     public void getWeeklyActivities(int days, OnWeeklyActivityListener listener) {
-        executor.execute(() -> {
-            try {
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.DAY_OF_YEAR, -(days - 1));
-                String startDate = DailyActivity.dateKey(cal.getTimeInMillis());
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onActivitiesLoaded(new java.util.ArrayList<>());
+            return;
+        }
 
-                List<DailyActivityEntity> entities = db.dailyActivityDao().getActivitiesSince(startDate, days);
-                List<DailyActivity> activities = new ArrayList<>();
-                for (DailyActivityEntity entity : entities) {
-                    activities.add(entity.toDailyActivity());
-                }
-                if (listener != null) listener.onActivitiesLoaded(activities);
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading weekly activities", e);
-                if (listener != null) listener.onActivitiesLoaded(new ArrayList<>());
-            }
-        });
+        // Calculate start date
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -(days - 1));
+        String startDate = DailyActivity.dateKey(cal.getTimeInMillis());
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .whereGreaterThanOrEqualTo("date", startDate)
+                .orderBy("date", com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .limit(days)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<DailyActivity> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                        if (doc.getData() != null) {
+                            activities.add(DailyActivity.fromMap(doc.getData()));
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading weekly activities", e);
+                    if (listener != null)
+                        listener.onActivitiesLoaded(new java.util.ArrayList<>());
+                });
     }
 
     /**
-     * Update today's step count.
+     * Update today's step count (incremental or replace).
      */
     public void updateTodaySteps(int steps, int calories, float distance) {
-        executor.execute(() -> {
-            try {
-                String today = DailyActivity.todayKey();
-                DailyActivityEntity entity = db.dailyActivityDao().getByDate(today);
-                if (entity == null) {
-                    entity = new DailyActivityEntity();
-                    entity.date = today;
-                }
-                entity.steps = steps;
-                entity.calories = calories;
-                entity.distance = distance;
-                entity.timestamp = System.currentTimeMillis();
-                db.dailyActivityDao().insertOrUpdate(entity);
-                Log.d(TAG, "Steps updated: " + steps);
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating steps", e);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("date", today);
+        updates.put("steps", steps);
+        updates.put("calories", calories);
+        updates.put("distance", distance);
+        updates.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Steps updated: " + steps))
+                .addOnFailureListener(e -> Log.e(TAG, "Error updating steps", e));
     }
 
     /**
-     * Reset today's step count to zero.
+     * Reset today's step count to zero in Firestore.
      */
     public void resetTodaySteps(OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                String today = DailyActivity.todayKey();
-                DailyActivityEntity entity = db.dailyActivityDao().getByDate(today);
-                if (entity == null) {
-                    entity = new DailyActivityEntity();
-                    entity.date = today;
-                }
-                entity.steps = 0;
-                entity.calories = 0;
-                entity.distance = 0f;
-                entity.timestamp = System.currentTimeMillis();
-                db.dailyActivityDao().insertOrUpdate(entity);
-                Log.d(TAG, "Steps reset successfully for date: " + today);
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error resetting steps", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        // Verify user is authenticated
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) {
+            Log.w(TAG, "Cannot reset steps: User not authenticated");
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
+
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            Log.w(TAG, "Cannot reset steps: Failed to get user document reference");
+            if (listener != null)
+                listener.onError("Failed to get user document reference");
+            return;
+        }
+
+        String today = DailyActivity.todayKey();
+        if (today == null || today.isEmpty()) {
+            Log.w(TAG, "Cannot reset steps: Invalid date key");
+            if (listener != null)
+                listener.onError("Invalid date format");
+            return;
+        }
+
+        Map<String, Object> resetData = new HashMap<>();
+        resetData.put("date", today);
+        resetData.put("steps", 0);
+        resetData.put("calories", 0);
+        resetData.put("distance", 0.0f);
+        resetData.put("timestamp", System.currentTimeMillis());
+
+        Log.d(TAG, "Resetting steps for user: " + currentUser.getUid() + " on date: " + today);
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .set(resetData, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Steps reset successfully for date: " + today);
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error resetting steps for date: " + today, e);
+                    String errorMsg = (e.getMessage() != null) ? e.getMessage() : "Unknown error occurred";
+                    if (listener != null)
+                        listener.onError(errorMsg);
+                });
     }
 
     /**
      * Increment active minutes for today.
      */
     public void addActiveMinutes(int minutes) {
-        executor.execute(() -> {
-            try {
-                String today = DailyActivity.todayKey();
-                DailyActivityEntity entity = db.dailyActivityDao().getByDate(today);
-                if (entity == null) {
-                    entity = new DailyActivityEntity();
-                    entity.date = today;
-                }
-                entity.activeMinutes += minutes;
-                entity.timestamp = System.currentTimeMillis();
-                db.dailyActivityDao().insertOrUpdate(entity);
-            } catch (Exception e) {
-                Log.e(TAG, "Error adding active minutes", e);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .update("activeMinutes", com.google.firebase.firestore.FieldValue.increment(minutes),
+                        "timestamp", System.currentTimeMillis())
+                .addOnFailureListener(e -> {
+                    // Document might not exist, create it
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("date", today);
+                    data.put("activeMinutes", minutes);
+                    data.put("timestamp", System.currentTimeMillis());
+                    userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                            .document(today)
+                            .set(data, SetOptions.merge());
+                });
     }
 
     /**
      * Record a completed workout to daily activity.
      */
     public void recordWorkoutToDaily(int durationSeconds, int caloriesBurned) {
-        executor.execute(() -> {
-            try {
-                String today = DailyActivity.todayKey();
-                DailyActivityEntity entity = db.dailyActivityDao().getByDate(today);
-                if (entity == null) {
-                    entity = new DailyActivityEntity();
-                    entity.date = today;
-                }
-                entity.workoutsCount += 1;
-                entity.totalWorkoutDuration += durationSeconds;
-                entity.calories += caloriesBurned;
-                entity.activeMinutes += durationSeconds / 60;
-                entity.timestamp = System.currentTimeMillis();
-                db.dailyActivityDao().insertOrUpdate(entity);
-            } catch (Exception e) {
-                Log.e(TAG, "Error recording workout to daily", e);
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        String today = DailyActivity.todayKey();
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .document(today)
+                .update(
+                        "workoutsCount", com.google.firebase.firestore.FieldValue.increment(1),
+                        "totalWorkoutDuration", com.google.firebase.firestore.FieldValue.increment(durationSeconds),
+                        "calories", com.google.firebase.firestore.FieldValue.increment(caloriesBurned),
+                        "activeMinutes", com.google.firebase.firestore.FieldValue.increment(durationSeconds / 60),
+                        "timestamp", System.currentTimeMillis())
+                .addOnFailureListener(e -> {
+                    // Document might not exist, create it
+                    DailyActivity activity = new DailyActivity(today);
+                    activity.addWorkout(durationSeconds);
+                    activity.addCalories(caloriesBurned);
+                    activity.addActiveMinutes(durationSeconds / 60);
+                    saveDailyActivity(activity, null);
+                });
     }
 
     // ============ Activity Collection Methods ============
+
+    private static final String COLLECTION_ACTIVITIES = "activities";
 
     /**
      * Save an auto-detected or manual activity.
      */
     public void saveActivity(String type, String source, long startTime, long endTime,
             int durationSeconds, float distanceKm, int calories, OnCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                FitnessActivityEntity entity = new FitnessActivityEntity();
-                entity.type = type;
-                entity.source = source;
-                entity.startTime = startTime;
-                entity.endTime = endTime;
-                entity.duration = durationSeconds;
-                entity.distance = distanceKm;
-                entity.calories = calories;
-                entity.timestamp = System.currentTimeMillis();
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onError("User not authenticated");
+            return;
+        }
 
-                long id = db.fitnessActivityDao().insert(entity);
-                Log.d(TAG, "Activity saved: " + type + " (" + id + ")");
-                if (listener != null) listener.onSuccess();
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving activity", e);
-                if (listener != null) listener.onError(e.getMessage());
-            }
-        });
+        Map<String, Object> activity = new HashMap<>();
+        activity.put("type", type);
+        activity.put("source", source); // "auto", "manual", "ai"
+        activity.put("startTime", startTime);
+        activity.put("endTime", endTime);
+        activity.put("duration", durationSeconds);
+        activity.put("distance", distanceKm);
+        activity.put("calories", calories);
+        activity.put("timestamp", System.currentTimeMillis());
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .add(activity)
+                .addOnSuccessListener(docRef -> {
+                    Log.d(TAG, "Activity saved: " + type + " (" + docRef.getId() + ")");
+                    if (listener != null)
+                        listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error saving activity", e);
+                    if (listener != null)
+                        listener.onError(e.getMessage());
+                });
     }
 
     /**
      * Get activities for today.
      */
     public void getTodayActivities(OnActivitiesListener listener) {
-        executor.execute(() -> {
-            try {
-                long todayStart = getTodayStartMillis();
-                List<FitnessActivityEntity> entities = db.fitnessActivityDao().getActivitiesSince(todayStart);
-                List<Map<String, Object>> activities = new ArrayList<>();
-                for (FitnessActivityEntity entity : entities) {
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("id", String.valueOf(entity.id));
-                    data.put("type", entity.type);
-                    data.put("source", entity.source);
-                    data.put("startTime", entity.startTime);
-                    data.put("endTime", entity.endTime);
-                    data.put("duration", entity.duration);
-                    data.put("distance", entity.distance);
-                    data.put("calories", entity.calories);
-                    data.put("timestamp", entity.timestamp);
-                    activities.add(data);
-                }
-                if (listener != null) listener.onActivitiesLoaded(activities);
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading today's activities", e);
-                if (listener != null) listener.onActivitiesLoaded(new ArrayList<>());
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        long todayStart = getTodayStartMillis();
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .whereGreaterThanOrEqualTo("startTime", todayStart)
+                .orderBy("startTime", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<Map<String, Object>> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Map<String, Object> data = doc.getData();
+                        if (data != null) {
+                            data.put("id", doc.getId());
+                            activities.add(data);
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                });
     }
 
     /**
      * Get activities for a date range.
      */
     public void getActivities(long startTime, long endTime, OnActivitiesListener listener) {
-        executor.execute(() -> {
-            try {
-                List<FitnessActivityEntity> entities = db.fitnessActivityDao().getActivitiesBetween(startTime, endTime);
-                List<Map<String, Object>> activities = new ArrayList<>();
-                for (FitnessActivityEntity entity : entities) {
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("id", String.valueOf(entity.id));
-                    data.put("type", entity.type);
-                    data.put("source", entity.source);
-                    data.put("startTime", entity.startTime);
-                    data.put("endTime", entity.endTime);
-                    data.put("duration", entity.duration);
-                    data.put("distance", entity.distance);
-                    data.put("calories", entity.calories);
-                    data.put("timestamp", entity.timestamp);
-                    activities.add(data);
-                }
-                if (listener != null) listener.onActivitiesLoaded(activities);
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading activities", e);
-                if (listener != null) listener.onActivitiesLoaded(new ArrayList<>());
-            }
-        });
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null)
+            return;
+
+        userDoc.collection(COLLECTION_ACTIVITIES)
+                .whereGreaterThanOrEqualTo("startTime", startTime)
+                .whereLessThanOrEqualTo("startTime", endTime)
+                .orderBy("startTime", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    java.util.List<Map<String, Object>> activities = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Map<String, Object> data = doc.getData();
+                        if (data != null) {
+                            data.put("id", doc.getId());
+                            activities.add(data);
+                        }
+                    }
+                    if (listener != null)
+                        listener.onActivitiesLoaded(activities);
+                });
     }
 
     private long getTodayStartMillis() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
         return cal.getTimeInMillis();
     }
 
     /**
      * Delete daily activities older than the specified number of days.
+     * Keeps only recent data to maintain performance and storage.
+     *
+     * @param daysToKeep Number of days of data to retain (e.g., 30)
+     * @param listener   Callback with success/failure result
      */
     public void deleteOldActivities(int daysToKeep, OnDeleteCompleteListener listener) {
-        executor.execute(() -> {
-            try {
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.DAY_OF_YEAR, -daysToKeep);
-                String dateThreshold = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                        .format(new Date(cal.getTimeInMillis()));
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onResult(false);
+            return;
+        }
 
-                Log.d(TAG, "Deleting activities older than: " + dateThreshold);
-                int deleted = db.dailyActivityDao().deleteOlderThan(dateThreshold);
-                Log.d(TAG, "Deleted " + deleted + " old activity records");
-                if (listener != null) listener.onResult(true);
-            } catch (Exception e) {
-                Log.e(TAG, "Error deleting old activities", e);
-                if (listener != null) listener.onResult(false);
-            }
-        });
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -daysToKeep);
+        String dateThreshold = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                .format(new Date(cal.getTimeInMillis()));
+
+        Log.d(TAG, "Deleting activities older than: " + dateThreshold);
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .whereLessThan("date", dateThreshold)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "Failed to delete old activity: " + doc.getId(), e));
+                    }
+                    Log.d(TAG, "Deleted " + querySnapshot.size() + " old activity records");
+                    if (listener != null)
+                        listener.onResult(true);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error deleting old activities", e);
+                    if (listener != null)
+                        listener.onResult(false);
+                });
     }
 
     // ============ Callback Interfaces ============
 
     public interface OnCompleteListener {
         void onSuccess();
+
         void onError(String error);
     }
 
     public interface OnProfileLoadedListener {
         void onProfileLoaded(Map<String, Object> profile);
+
         void onError(String error);
     }
 
