@@ -156,7 +156,6 @@ public class AnalyticsFragment extends Fragment {
         tvCalories = view.findViewById(R.id.tvCalories);
         tvTrainingPercent = view.findViewById(R.id.tvTrainingPercent);
         progressTraining = view.findViewById(R.id.progressTraining);
-        tvHeartRate = view.findViewById(R.id.tvHeartRate);
         tvSteps = view.findViewById(R.id.tvSteps);
         tvWaterCups = view.findViewById(R.id.tvWaterCups);
         progressWater = view.findViewById(R.id.progressWater);

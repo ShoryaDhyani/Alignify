@@ -432,11 +432,6 @@ public class DashboardActivity extends AppCompatActivity {
     private void setupListeners() {
         btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
 
-        // Start Running quick action
-        View btnStartRunning = findViewById(R.id.btnStartRunning);
-        if (btnStartRunning != null) {
-            btnStartRunning.setOnClickListener(v -> startActivity(new Intent(this, RunActivity.class)));
-        }
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {

@@ -141,7 +141,6 @@ public class ActivityActivity extends AppCompatActivity {
         tvCalories = findViewById(R.id.tvCalories);
         tvTrainingPercent = findViewById(R.id.tvTrainingPercent);
         progressTraining = findViewById(R.id.progressTraining);
-        tvHeartRate = findViewById(R.id.tvHeartRate);
         tvSteps = findViewById(R.id.tvSteps);
         tvWaterCups = findViewById(R.id.tvWaterCups);
         progressWater = findViewById(R.id.progressWater);
@@ -574,7 +573,9 @@ public class ActivityActivity extends AppCompatActivity {
         progressTraining.setProgress(trainingPercent);
 
         // Heart rate (placeholder - would need health connect integration)
-        tvHeartRate.setText("-- Bpm");
+        if (tvHeartRate != null) {
+            tvHeartRate.setText("-- Bpm");
+        }
     }
 
     private void updateWaterUI() {

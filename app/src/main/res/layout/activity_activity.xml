@@ -130,170 +130,127 @@
             </LinearLayout>
 
             <!-- Row 2: Training Time + Heart Rate + Steps -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="136dp"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <!-- Training Time Card (Purple with circular progress) -->
+
+            <!-- Right column: Heart Rate + Steps -->
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="176dp"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_purple"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-                <!-- Training Time Card (Purple with circular progress) -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Training time"
+                    android:textColor="@color/text_primary_dark"
+                    android:textSize="12sp" />
 
-                <!-- Right column: Heart Rate + Steps -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1">
+
+                    <ProgressBar
+                        android:id="@+id/progressTraining"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:layout_gravity="center"
+                        android:indeterminate="false"
+                        android:max="100"
+                        android:progress="80"
+                        android:progressDrawable="@drawable/circular_progress_training" />
+
+                    <TextView
+                        android:id="@+id/tvTrainingPercent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="80%"
+                        android:textColor="@color/text_primary_dark"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                </FrameLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1.2"
+                android:orientation="vertical">
+
+
+                <!-- Steps Card (Lime) - Clickable -->
                 <LinearLayout
-                    android:layout_width="5dp"
+                    android:id="@+id/stepsCard"
+                    android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_card_purple"
+                    android:background="@drawable/bg_card_lime"
+                    android:clickable="true"
+                    android:clipToOutline="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_steps" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Steps"
+                            android:textColor="@color/text_primary_dark"
+                            android:textSize="16sp" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvSteps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="999/2000"
+                        android:textColor="@color/text_primary_dark"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Training time"
-                        android:textColor="@color/text_primary_dark"
-                        android:textSize="12sp" />
-
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_marginTop="8dp"
-                        android:layout_weight="1">
-
-                        <ProgressBar
-                            android:id="@+id/progressTraining"
-                            style="?android:attr/progressBarStyleHorizontal"
-                            android:layout_width="80dp"
-                            android:layout_height="80dp"
-                            android:layout_gravity="center"
-                            android:indeterminate="false"
-                            android:max="100"
-                            android:progress="80"
-                            android:progressDrawable="@drawable/circular_progress_training" />
-
-                        <TextView
-                            android:id="@+id/tvTrainingPercent"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center"
-                            android:text="80%"
-                            android:textColor="@color/text_primary_dark"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-
-                    </FrameLayout>
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1.2"
-                    android:orientation="vertical">
-
-                    <!-- Heart Rate Card (Pink) -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="84dp"
-                        android:layout_marginBottom="6dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_card_pink"
-                        android:orientation="vertical"
-                        android:padding="12dp">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:src="@drawable/ic_heart" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:text="Hearth Rate"
-                                android:textColor="@color/text_primary_dark"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvHeartRate"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="79 Bpm"
-                            android:textColor="@color/text_primary_dark"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
-
-                    <!-- Steps Card (Lime) - Clickable -->
-                    <LinearLayout
-                        android:id="@+id/stepsCard"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_card_lime"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:orientation="vertical"
-                        android:padding="12dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:src="@drawable/ic_steps" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:text="Steps"
-                                android:textColor="@color/text_primary_dark"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvSteps"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="999/2000"
-                            android:textColor="@color/text_primary_dark"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Keep it Up! 💪"
-                            android:textColor="@color/text_secondary_dark"
-                            android:textSize="11sp" />
-
-                    </LinearLayout>
+                        android:layout_marginTop="2dp"
+                        android:text="Keep it Up!"
+                        android:textColor="@color/text_secondary_dark"
+                        android:textSize="11sp" />
 
                 </LinearLayout>
 
             </LinearLayout>
+
+        </LinearLayout>
 
             <!-- Row 3: Water Card -->
             <LinearLayout

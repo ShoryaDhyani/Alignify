@@ -26,7 +26,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.mapbox.maps.Style;
 import android.view.View;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
@@ -182,8 +181,6 @@ public class SettingsActivity extends AppCompatActivity {
         // Update theme mode display
         String themeMode = prefs.getString(AlignifyApp.KEY_THEME_MODE, "light");
         updateThemeModeDisplay(themeMode);
-        updateMapStyleDisplay(AlignifyApp.resolveMapStyleUri(this));
-
         updateUI();
     }
 
@@ -312,10 +309,6 @@ public class SettingsActivity extends AppCompatActivity {
             settingTheme.setOnClickListener(v -> showThemeModeDialog());
         }
 
-        View settingMapStyle = findViewById(R.id.settingMapStyle);
-        if (settingMapStyle != null) {
-            settingMapStyle.setOnClickListener(v -> showMapStyleDialog());
-        }
     }
 
     private void updateThemeModeDisplay(String themeMode) {
@@ -371,101 +364,7 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void updateMapStyleDisplay(String styleUri) {
-        if (tvMapStyle == null) {
-            return;
-        }
-        tvMapStyle.setText(AlignifyApp.getMapStyleLabel(styleUri));
-    }
 
-    private void showMapStyleDialog() {
-        final String[] labels = {
-                "Streets",
-                "Outdoors",
-                "Light",
-                "Dark",
-                "Satellite",
-                "Custom URI"
-        };
-        final String[] styleUris = {
-                AlignifyApp.MAP_STYLE_STREETS,
-                AlignifyApp.MAP_STYLE_OUTDOORS,
-                AlignifyApp.MAP_STYLE_LIGHT,
-                AlignifyApp.MAP_STYLE_DARK,
-                AlignifyApp.MAP_STYLE_SATELLITE
-        };
-
-        String currentStyle = AlignifyApp.resolveMapStyleUri(this);
-        int checkedItem = 5;
-        for (int i = 0; i < styleUris.length; i++) {
-            if (styleUris[i].equals(currentStyle)) {
-                checkedItem = i;
-                break;
-            }
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Map Style")
-                .setSingleChoiceItems(labels, checkedItem, (dialog, which) -> {
-                    if (which == 5) {
-                        dialog.dismiss();
-                        showCustomMapStyleDialog();
-                        return;
-                    }
-
-                    AlignifyApp.saveMapStyleUri(this, styleUris[which]);
-                    updateMapStyleDisplay(styleUris[which]);
-                    Toast.makeText(this, "Map style updated", Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void showCustomMapStyleDialog() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String currentStyle = prefs.getString(AlignifyApp.KEY_MAP_STYLE_URI, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setHint("mapbox://styles/username/style_id");
-        input.setText(currentStyle);
-        input.setSelection(input.getText().length());
-
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
-        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
-        params.leftMargin = dpToPx(20);
-        params.rightMargin = dpToPx(20);
-        input.setLayoutParams(params);
-        container.addView(input);
-
-        new AlertDialog.Builder(this)
-                .setTitle("Custom Map Style URI")
-                .setMessage("Paste style URI, e.g. mapbox://styles/shoryadhyani/cmms6pbia008y01sge7vqb3r6")
-                .setView(container)
-                .setPositiveButton("Save", (dialog, which) -> {
-                    String value = input.getText().toString().trim();
-                    String normalized = AlignifyApp.normalizeMapStyleInput(value);
-                    if (normalized == null) {
-                        Toast.makeText(this,
-                                "Invalid style. Use mapbox://styles/... or paste a Mapbox Studio style URL.",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    AlignifyApp.saveMapStyleUri(this, normalized);
-                    updateMapStyleDisplay(normalized);
-                    Toast.makeText(this, "Custom map style saved", Toast.LENGTH_SHORT).show();
-                })
-                .setNeutralButton("Use Studio Style", (dialog, which) -> {
-                    AlignifyApp.saveMapStyleUri(this, AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-                    updateMapStyleDisplay(AlignifyApp.DEFAULT_MAPBOX_STYLE_URI);
-                    Toast.makeText(this, "Studio style applied", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
 
     private void setupBottomNavigation() {
         NavigationHelper.setupBottomNavigation(this, NavigationHelper.NAV_PROFILE,

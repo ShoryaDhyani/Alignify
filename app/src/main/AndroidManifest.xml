@@ -9,8 +9,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    
-    <!-- Step Counter permissions -->
+
     <!-- Required for Android 10+ to access step counter sensor -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     
@@ -122,18 +121,7 @@
             android:name=".ExerciseActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
-        
-        <!-- Step Tracking Screen -->
-        <activity
-            android:name=".StepActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        
-        <!-- Run/Walk Activity (Strava-style tracker) -->
-        <activity
-            android:name=".RunActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+
         
         <!-- Activity Screen (Redesigned History) -->
         <activity
@@ -159,12 +147,7 @@
             android:exported="false"
             android:foregroundServiceType="health" />
 
-        <!-- Sleep Tracking Foreground Service -->
-        <service
-            android:name=".service.SleepTrackingService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="health" />
+
         
         <!-- Water Reminder Broadcast Receiver -->
         <receiver

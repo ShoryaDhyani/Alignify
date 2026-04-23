@@ -81,7 +81,6 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
 
     // Feedback preferences from settings
     private static final String PREFS_NAME = "AlignifyPrefs";
-    private static final String KEY_VOICE_FEEDBACK = "voice_feedback";
     private static final String KEY_TEXT_FEEDBACK = "text_feedback";
     private boolean voiceFeedbackEnabled = true;
     private boolean textFeedbackEnabled = true;
@@ -135,7 +134,6 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
 
     private void loadFeedbackPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        voiceFeedbackEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, true);
         textFeedbackEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, true);
     }
 
@@ -355,14 +353,10 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Feedback Settings")
                 .setMultiChoiceItems(
-                        new String[] { "Voice Feedback", "Text Feedback" },
-                        new boolean[] { voiceFeedbackEnabled, textFeedbackEnabled },
+                        new String[] { "Text Feedback" },
+                        new boolean[] {textFeedbackEnabled },
                         (dialog, which, isChecked) -> {
-                            if (which == 0) {
-                                voiceFeedbackEnabled = isChecked;
-                            } else {
-                                textFeedbackEnabled = isChecked;
-                            }
+                            textFeedbackEnabled = isChecked;
                             saveFeedbackPreferences();
                             updateFeedbackIndicators();
                         })
@@ -373,7 +367,6 @@ public class ExerciseActivity extends AppCompatActivity implements PoseLandmarke
     private void saveFeedbackPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit()
-                .putBoolean(KEY_VOICE_FEEDBACK, voiceFeedbackEnabled)
                 .putBoolean(KEY_TEXT_FEEDBACK, textFeedbackEnabled)
                 .apply();
     }
