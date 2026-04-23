@@ -89,7 +89,7 @@ scripts
 adapters
 .gsd
 .gemini
-
+.keystore
 # GSD Session Files
 .gsd/STATE.md
 .gsd/JOURNAL.md

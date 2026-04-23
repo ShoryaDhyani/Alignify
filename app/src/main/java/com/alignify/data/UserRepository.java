@@ -5,10 +5,14 @@ import android.util.Log;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -432,14 +436,31 @@ public class UserRepository {
      * Reset today's step count to zero in Firestore.
      */
     public void resetTodaySteps(OnCompleteListener listener) {
-        DocumentReference userDoc = getUserDocument();
-        if (userDoc == null) {
+        // Verify user is authenticated
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) {
+            Log.w(TAG, "Cannot reset steps: User not authenticated");
             if (listener != null)
                 listener.onError("User not authenticated");
             return;
         }
 
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            Log.w(TAG, "Cannot reset steps: Failed to get user document reference");
+            if (listener != null)
+                listener.onError("Failed to get user document reference");
+            return;
+        }
+
         String today = DailyActivity.todayKey();
+        if (today == null || today.isEmpty()) {
+            Log.w(TAG, "Cannot reset steps: Invalid date key");
+            if (listener != null)
+                listener.onError("Invalid date format");
+            return;
+        }
+
         Map<String, Object> resetData = new HashMap<>();
         resetData.put("date", today);
         resetData.put("steps", 0);
@@ -447,18 +468,21 @@ public class UserRepository {
         resetData.put("distance", 0.0f);
         resetData.put("timestamp", System.currentTimeMillis());
 
+        Log.d(TAG, "Resetting steps for user: " + currentUser.getUid() + " on date: " + today);
+
         userDoc.collection(COLLECTION_DAILY_ACTIVITY)
                 .document(today)
                 .set(resetData, SetOptions.merge())
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Steps reset successfully");
+                    Log.d(TAG, "Steps reset successfully for date: " + today);
                     if (listener != null)
                         listener.onSuccess();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error resetting steps", e);
+                    Log.e(TAG, "Error resetting steps for date: " + today, e);
+                    String errorMsg = (e.getMessage() != null) ? e.getMessage() : "Unknown error occurred";
                     if (listener != null)
-                        listener.onError(e.getMessage());
+                        listener.onError(errorMsg);
                 });
     }
 
@@ -618,6 +642,47 @@ public class UserRepository {
         return cal.getTimeInMillis();
     }
 
+    /**
+     * Delete daily activities older than the specified number of days.
+     * Keeps only recent data to maintain performance and storage.
+     *
+     * @param daysToKeep Number of days of data to retain (e.g., 30)
+     * @param listener   Callback with success/failure result
+     */
+    public void deleteOldActivities(int daysToKeep, OnDeleteCompleteListener listener) {
+        DocumentReference userDoc = getUserDocument();
+        if (userDoc == null) {
+            if (listener != null)
+                listener.onResult(false);
+            return;
+        }
+
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -daysToKeep);
+        String dateThreshold = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                .format(new Date(cal.getTimeInMillis()));
+
+        Log.d(TAG, "Deleting activities older than: " + dateThreshold);
+
+        userDoc.collection(COLLECTION_DAILY_ACTIVITY)
+                .whereLessThan("date", dateThreshold)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        doc.getReference().delete()
+                                .addOnFailureListener(e -> Log.e(TAG, "Failed to delete old activity: " + doc.getId(), e));
+                    }
+                    Log.d(TAG, "Deleted " + querySnapshot.size() + " old activity records");
+                    if (listener != null)
+                        listener.onResult(true);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error deleting old activities", e);
+                    if (listener != null)
+                        listener.onResult(false);
+                });
+    }
+
     // ============ Callback Interfaces ============
 
     public interface OnCompleteListener {
@@ -646,5 +711,9 @@ public class UserRepository {
 
     public interface OnGoalsLoadedListener {
         void onGoalsLoaded(Map<String, Object> goals);
+    }
+
+    public interface OnDeleteCompleteListener {
+        void onResult(boolean success);
     }
 }

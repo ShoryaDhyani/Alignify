@@ -7,9 +7,7 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.alignify.data.sleep.AppDatabase;
-import com.alignify.data.sleep.SleepSession;
-import com.alignify.data.sleep.SleepSessionDao;
+
 import com.alignify.engine.CaloriesEngine;
 
 import java.text.SimpleDateFormat;
@@ -91,7 +89,6 @@ public class FitnessDataManager {
     private final MutableLiveData<Integer> waterCupsLiveData = new MutableLiveData<>(0);
     private final MutableLiveData<Integer> activeMinutesLiveData = new MutableLiveData<>(0);
     private final MutableLiveData<Float> distanceLiveData = new MutableLiveData<>(0f);
-    private final MutableLiveData<SleepSession> lastSleepLiveData = new MutableLiveData<>();
     
     // Wearable specific LiveData
     private final MutableLiveData<Integer> latestHeartRateLiveData = new MutableLiveData<>(0);
@@ -121,8 +118,6 @@ public class FitnessDataManager {
         this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         checkAndResetForNewDay();
         loadInitialData();
-        loadLastSleepFromDb();
-        
         // Auto-sync with wearables on init if available
         syncWithWearable();
     }
@@ -133,36 +128,29 @@ public class FitnessDataManager {
      * Get LiveData for the most recent sleep session.
      * Observed by UI screens for real-time sleep data updates.
      */
-    public LiveData<SleepSession> getLastSleepLiveData() {
-        return lastSleepLiveData;
-    }
+
 
     /**
      * Set the latest sleep session. Called by SleepTrackingService when a session completes.
      * Updates both the LiveData stream and SharedPreferences for backward compatibility.
      */
-    public void setLastSleepSession(SleepSession session) {
-        lastSleepLiveData.postValue(session);
-        // Also update simple sleep_hours in SharedPreferences for backward compat
-        float hours = session.durationMinutes / 60f;
-        prefs.edit().putFloat(KEY_SLEEP_HOURS, hours).apply();
-    }
+
 
     /**
      * Load today's sleep session from Room DB on background thread.
      * Called during initialization to populate LiveData from persisted data.
      */
-    private void loadLastSleepFromDb() {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                SleepSessionDao dao = AppDatabase.getInstance(context).sleepSessionDao();
-                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-                SleepSession session = dao.getByDate(today);
-                if (session != null) {
-                    lastSleepLiveData.postValue(session);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading sleep session from DB", e);
+
+    /**
+     * Delete old data older than 30 days to maintain performance.
+     * Called periodically to keep only recent data.
+     */
+    public void cleanupOldData() {
+        UserRepository.getInstance().deleteOldActivities(30, result -> {
+            if (result) {
+                Log.d(TAG, "Successfully cleaned up data older than 30 days");
+            } else {
+                Log.w(TAG, "Failed to cleanup old data");
             }
         });
     }
@@ -187,7 +175,6 @@ public class FitnessDataManager {
             yesterday.setActiveMinutes(prefs.getInt(KEY_ACTIVE_MINUTES_TODAY, 0));
             yesterday.setWaterCups(prefs.getInt(KEY_WATER_CUPS, 0));
             yesterday.setWaterGoal(prefs.getInt(KEY_WATER_GOAL, DEFAULT_WATER_GOAL));
-            yesterday.setSleepHours(prefs.getFloat(KEY_SLEEP_HOURS, 0f));
             yesterday.setSquatReps(prefs.getInt(KEY_SQUAT_REPS, 0));
             yesterday.setBicepCurlReps(prefs.getInt(KEY_BICEP_CURL_REPS, 0));
             yesterday.setLungeReps(prefs.getInt(KEY_LUNGE_REPS, 0));
@@ -736,7 +723,6 @@ public class FitnessDataManager {
         activity.setActiveMinutes(getActiveMinutesToday());
         activity.setWaterCups(getWaterCupsToday());
         activity.setWaterGoal(getWaterGoal());
-        activity.setSleepHours(getSleepHours());
         activity.setSquatReps(getSquatRepsToday());
         activity.setBicepCurlReps(getBicepCurlRepsToday());
         activity.setLungeReps(getLungeRepsToday());
@@ -791,6 +777,9 @@ public class FitnessDataManager {
                     stepsLiveData.postValue(firestoreSteps);
                     caloriesLiveData.postValue(activity.getCalories());
                     distanceLiveData.postValue(activity.getDistance());
+                } else if (firestoreSteps == 0 && localSteps > 0) {
+                    // If Firestore shows 0 but local has data, sync the local data to Firestore
+                    syncToFirestore();
                 }
 
                 // For other metrics, take Firestore values if local is 0
@@ -801,6 +790,8 @@ public class FitnessDataManager {
                     setWaterCupsToday(activity.getWaterCups());
                 }
 
+                // Refresh LiveData to ensure UI shows updated data after any changes
+                loadInitialData();
                 Log.d(TAG, "Loaded and merged data from Firestore");
             }
 

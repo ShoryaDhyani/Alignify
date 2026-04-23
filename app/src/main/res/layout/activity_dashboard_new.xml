@@ -6,10 +6,16 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
+<!--    <androidx.coordinatorlayout.widget.CoordinatorLayout-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="match_parent">-->
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="16dp">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -75,13 +81,7 @@
         </LinearLayout>
 
         <!-- Main Content -->
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:paddingBottom="16dp">
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -383,8 +383,8 @@
 
                         <ImageButton
                             android:id="@+id/btnResetSteps"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:contentDescription="Reset steps"
                             android:src="@drawable/ic_refresh"
@@ -511,60 +511,6 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
                                 android:text="GPS Tracking"
-                                android:textColor="@color/text_secondary_dark"
-                                android:textSize="10sp" />
-
-                        </LinearLayout>
-
-                    </androidx.cardview.widget.CardView>
-
-                    <!-- Talk to Coach Card -->
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/btnTalkCoach"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="@color/card_coach"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="2dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="16dp">
-
-                            <FrameLayout
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:background="@drawable/bg_tag_orange">
-
-                                <ImageView
-                                    android:layout_width="28dp"
-                                    android:layout_height="28dp"
-                                    android:layout_gravity="center"
-                                    android:src="@drawable/ic_chatbot"
-                                    app:tint="@color/white" />
-
-                            </FrameLayout>
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="10dp"
-                                android:text="AI\nCoach"
-                                android:textAlignment="center"
-                                android:textColor="@color/text_primary_dark"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="Fitness Coach"
                                 android:textColor="@color/text_secondary_dark"
                                 android:textSize="10sp" />
 
@@ -709,27 +655,15 @@
 
             </LinearLayout>
 
-        </ScrollView>
+
 
         <!-- Bottom Navigation Bar -->
         <include layout="@layout/layout_bottom_navbar" />
 
     </LinearLayout>
+    </ScrollView>
 
     <!-- Chatbot FAB - Fixed position above bottom nav -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabChatbot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="80dp"
-            android:contentDescription="Open chatbot"
-            android:src="@drawable/ic_chatbot"
-            app:backgroundTint="@color/card_lime"
-            app:tint="@null" />
-
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <!-- Navigation Drawer -->
     <com.google.android.material.navigation.NavigationView

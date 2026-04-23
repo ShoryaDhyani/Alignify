@@ -19,7 +19,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
-import com.alignify.data.sleep.SleepSession;
 import com.alignify.service.WaterReminderService;
 import com.alignify.util.WaterTrackingHelper;
 import com.github.mikephil.charting.charts.BarChart;
@@ -33,7 +32,6 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -56,11 +54,7 @@ public class AnalyticsFragment extends Fragment {
     private TextView tvTrainingPercent;
     private ProgressBar progressTraining;
     private TextView tvHeartRate;
-    private TextView tvActiveMinutes;
     private TextView tvSteps;
-    private TextView tvSleep;
-    private TextView tvSleepQuality;
-    private CircularProgressIndicator progressQuality;
 
     // Water tracking UI
     private TextView tvWaterCups;
@@ -115,6 +109,7 @@ public class AnalyticsFragment extends Fragment {
             }
         });
         fitnessDataManager.getActiveMinutesLiveData().observe(getViewLifecycleOwner(), activeMinutes -> {
+            // Update training progress percentage and progress bar
             if (tvTrainingPercent != null && progressTraining != null) {
                 int trainingGoal = fitnessDataManager.getActiveTimeGoal();
                 int trainingPercent = trainingGoal > 0 ? Math.min(100, (activeMinutes * 100) / trainingGoal) : 0;
@@ -122,19 +117,7 @@ public class AnalyticsFragment extends Fragment {
                 progressTraining.setProgress(trainingPercent);
             }
         });
-        fitnessDataManager.getActiveMinutesLiveData().observe(getViewLifecycleOwner(), activeMinutes -> {
-            if (tvActiveMinutes != null) {
-                tvActiveMinutes.setText(activeMinutes + " min");
-            }
-        });
 
-        fitnessDataManager.getLastSleepLiveData().observe(getViewLifecycleOwner(), session -> {
-            if (session != null) {
-                if (tvSleep != null) tvSleep.setText(session.getFormattedDuration());
-                if (tvSleepQuality != null) tvSleepQuality.setText(String.format(Locale.US, "Quality %d%%", session.qualityScore));
-                if (progressQuality != null) progressQuality.setProgressCompat(session.qualityScore, true);
-            }
-        });
         fitnessDataManager.getWaterCupsLiveData().observe(getViewLifecycleOwner(), cups -> {
             if (tvWaterCups != null && progressWater != null) {
                 int waterGoal = fitnessDataManager.getWaterGoal();
@@ -173,12 +156,7 @@ public class AnalyticsFragment extends Fragment {
         tvCalories = view.findViewById(R.id.tvCalories);
         tvTrainingPercent = view.findViewById(R.id.tvTrainingPercent);
         progressTraining = view.findViewById(R.id.progressTraining);
-        tvHeartRate = view.findViewById(R.id.tvHeartRate);
         tvSteps = view.findViewById(R.id.tvSteps);
-        tvActiveMinutes = view.findViewById(R.id.tvActiveMinutes);
-        tvSleep = view.findViewById(R.id.tvSleep);
-        tvSleepQuality = view.findViewById(R.id.tvSleepQuality);
-        progressQuality = view.findViewById(R.id.progressQuality);
         tvWaterCups = view.findViewById(R.id.tvWaterCups);
         progressWater = view.findViewById(R.id.progressWater);
         btnAddWater = view.findViewById(R.id.btnAddWater);
@@ -266,8 +244,6 @@ public class AnalyticsFragment extends Fragment {
 
         container.setOnClickListener(v -> {
             selectedDate = (Calendar) dayItem.date.clone();
-            setupWeekCalendar();
-            loadDataForDate(dayItem.date);
             showActivityHistoryBottomSheet(dayItem.date);
         });
 
@@ -300,7 +276,9 @@ public class AnalyticsFragment extends Fragment {
                 if (activity != null) {
                     tvHistorySteps.setText(String.valueOf(activity.getSteps()));
                     tvHistoryCalories.setText(String.valueOf(activity.getCalories()));
-                    tvHistoryWater.setText(String.valueOf(waterHelper.getWaterCups()));
+                    // Use FitnessDataManager for water to ensure consistency with main display
+                    int cups = fitnessDataManager.getWaterCupsToday();
+                    tvHistoryWater.setText(String.valueOf(cups));
                     populateExerciseBreakdown(exerciseBreakdownContainer, activity);
                 } else {
                     tvHistorySteps.setText("0");
@@ -314,6 +292,7 @@ public class AnalyticsFragment extends Fragment {
         setupExerciseMinutesChart(chartExerciseMinutes, date);
 
         sheetView.findViewById(R.id.btnCloseHistory).setOnClickListener(v -> bottomSheetDialog.dismiss());
+        
         bottomSheetDialog.show();
     }
 
@@ -332,14 +311,23 @@ public class AnalyticsFragment extends Fragment {
 
         float[] stepsData = new float[7];
         int[] loadedCount = { 0 };
+        Throwable[] loadErrors = { null };
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
             UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
-                stepsData[index] = activity != null ? activity.getSteps() : 0;
+                try {
+                    stepsData[index] = activity != null ? activity.getSteps() : 0;
+                } catch (Exception e) {
+                    loadErrors[0] = e;
+                    stepsData[index] = 0;
+                }
                 loadedCount[0]++;
 
                 if (loadedCount[0] == 7 && isAdded()) {
+                    if (loadErrors[0] != null) {
+                        android.util.Log.w(TAG, "Error loading chart data", loadErrors[0]);
+                    }
                     requireActivity().runOnUiThread(() -> {
                         List<BarEntry> stepsEntries = new ArrayList<>();
                         for (int j = 0; j < 7; j++) {
@@ -402,14 +390,23 @@ public class AnalyticsFragment extends Fragment {
 
         float[] minutesData = new float[7];
         int[] loadedCount = { 0 };
+        Throwable[] loadErrors = { null };
 
         for (int i = 0; i < 7; i++) {
             final int index = i;
             UserRepository.getInstance().getDailyActivity(dateKeys[i], activity -> {
-                minutesData[index] = activity != null ? activity.getActiveMinutes() : 0;
+                try {
+                    minutesData[index] = activity != null ? activity.getActiveMinutes() : 0;
+                } catch (Exception e) {
+                    loadErrors[0] = e;
+                    minutesData[index] = 0;
+                }
                 loadedCount[0]++;
 
                 if (loadedCount[0] == 7 && isAdded()) {
+                    if (loadErrors[0] != null) {
+                        android.util.Log.w(TAG, "Error loading exercise minutes chart data", loadErrors[0]);
+                    }
                     requireActivity().runOnUiThread(() -> {
                         List<Entry> entries = new ArrayList<>();
                         for (int j = 0; j < 7; j++) {
@@ -557,14 +554,7 @@ public class AnalyticsFragment extends Fragment {
         tvTrainingPercent.setText(trainingPercent + "%");
         progressTraining.setProgress(trainingPercent);
 
-        float sleepHours = activity.getSleepHours();
-        if (sleepHours > 0) {
-            tvSleep.setText(String.format(Locale.US, "%.1f hrs", sleepHours));
-        } else {
-            tvSleep.setText("-- hrs");
-        }
-
-        tvHeartRate.setText("-- Bpm");
+        // Note: tvHeartRate will be updated by LiveData observer when wearable data is available
     }
 
     private void updateWaterUI() {

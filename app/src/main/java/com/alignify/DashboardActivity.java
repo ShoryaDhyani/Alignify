@@ -36,7 +36,6 @@ import com.alignify.util.StepCounterHelper;
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
-import com.alignify.chatbot.ChatbotActivity;
 import com.alignify.util.ProfileImageHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -433,25 +432,6 @@ public class DashboardActivity extends AppCompatActivity {
     private void setupListeners() {
         btnStartCorrection.setOnClickListener(v -> navigateToExerciseSelection());
 
-        // Start Running quick action
-        View btnStartRunning = findViewById(R.id.btnStartRunning);
-        if (btnStartRunning != null) {
-            btnStartRunning.setOnClickListener(v -> startActivity(new Intent(this, RunActivity.class)));
-        }
-
-        // AI Coach quick action
-        View btnTalkCoach = findViewById(R.id.btnTalkCoach);
-        if (btnTalkCoach != null) {
-            btnTalkCoach.setOnClickListener(v -> startActivity(new Intent(this, ChatbotActivity.class)));
-        }
-
-        // Chatbot FAB
-        FloatingActionButton fabChatbot = findViewById(R.id.fabChatbot);
-        if (fabChatbot != null) {
-            fabChatbot.setOnClickListener(v -> {
-                startActivity(new Intent(this, ChatbotActivity.class));
-            });
-        }
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {
@@ -592,34 +572,38 @@ public class DashboardActivity extends AppCompatActivity {
      * Resets steps both locally and in Firestore.
      */
     private void resetSteps() {
-        // Reset local step counter
+        // Reset local step counter first
         StepCounterService.resetStepCounter(this);
 
-        // Reset in Firestore
-        UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
-            @Override
-            public void onSuccess() {
-                runOnUiThread(() -> {
-                    updateStepCountDisplay();
-                    Toast.makeText(DashboardActivity.this, "Steps reset successfully", Toast.LENGTH_SHORT).show();
-                });
-            }
-
-            @Override
-            public void onError(String error) {
-                runOnUiThread(() -> {
-                    Toast.makeText(DashboardActivity.this, "Failed to sync reset: " + error, Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
-
-        // Update UI immediately
+        // Update UI immediately to show reset
         if (stepsValue != null) {
             stepsValue.setText("0");
         }
         if (stepProgressBar != null) {
             stepProgressBar.setProgress(0);
         }
+
+        // Then sync to Firestore
+        UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
+            @Override
+            public void onSuccess() {
+                runOnUiThread(() -> {
+                    Log.d("DashboardActivity", "Steps synced successfully");
+                    updateStepCountDisplay();
+                    Toast.makeText(DashboardActivity.this, "Steps reset and synced", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    Log.e("DashboardActivity", "Sync error: " + error);
+                    // Steps are still reset locally, but sync failed
+                    String errorMsg = "Steps reset locally but sync failed: " + error;
+                    Toast.makeText(DashboardActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     /**

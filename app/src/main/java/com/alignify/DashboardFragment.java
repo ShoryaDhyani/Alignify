@@ -26,7 +26,6 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.alignify.chatbot.ChatbotActivity;
 import com.alignify.data.DailyActivity;
 import com.alignify.data.FitnessDataManager;
 import com.alignify.data.UserRepository;
@@ -373,16 +372,6 @@ public class DashboardFragment extends Fragment {
         if (btnStartRunning != null) {
             btnStartRunning.setOnClickListener(v -> navigateToTab(NavigationHelper.NAV_RUN));
         }
-
-        View btnTalkCoach = view.findViewById(R.id.btnTalkCoach);
-        if (btnTalkCoach != null) {
-            btnTalkCoach.setOnClickListener(v -> startActivity(new Intent(requireContext(), ChatbotActivity.class)));
-        }
-
-        FloatingActionButton fabChatbot = view.findViewById(R.id.fabChatbot);
-        if (fabChatbot != null) {
-            fabChatbot.setOnClickListener(v -> startActivity(new Intent(requireContext(), ChatbotActivity.class)));
-        }
     }
 
     private boolean onNavigationItemSelected(MenuItem item) {
@@ -511,15 +500,25 @@ public class DashboardFragment extends Fragment {
     private void resetSteps() {
         if (!isAdded())
             return;
+
+        // Reset local step counter first
         StepCounterService.resetStepCounter(requireContext());
 
+        // Update UI immediately to show reset
+        if (stepsValue != null)
+            stepsValue.setText("0");
+        if (stepProgressBar != null)
+            stepProgressBar.setProgress(0);
+
+        // Then sync to Firestore
         UserRepository.getInstance().resetTodaySteps(new UserRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
+                        Log.d("DashboardFragment", "Steps synced successfully");
                         updateStepCountDisplay();
-                        Toast.makeText(requireContext(), "Steps reset successfully", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), "Steps reset and synced", Toast.LENGTH_SHORT).show();
                     });
                 }
             }
@@ -528,16 +527,14 @@ public class DashboardFragment extends Fragment {
             public void onError(String error) {
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "Failed to sync reset: " + error, Toast.LENGTH_SHORT).show();
+                        Log.e("DashboardFragment", "Sync error: " + error);
+                        // Steps are still reset locally, but sync failed
+                        String errorMsg = "Steps reset locally but sync failed: " + error;
+                        Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_LONG).show();
                     });
                 }
             }
         });
-
-        if (stepsValue != null)
-            stepsValue.setText("0");
-        if (stepProgressBar != null)
-            stepProgressBar.setProgress(0);
     }
 
     private void startStepTracking() {

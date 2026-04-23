@@ -611,22 +611,9 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        // Profile is complete — request location so we can open RunActivity with
-        // tracking ready
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            launchActivity(RunActivity.class);
-        } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
-        }
+        launchActivity(HomeActivity.class);
     }
 
-    private final ActivityResultLauncher<String> locationPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(), granted -> {
-                // Whether granted or denied, proceed — RunActivity handles missing permission
-                // gracefully
-                launchActivity(RunActivity.class);
-            });
 
     private void launchActivity(Class<?> cls) {
         Intent intent = new Intent(this, cls);

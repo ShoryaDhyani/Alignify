@@ -98,9 +98,6 @@ public class DailyActivity {
         return waterGoal;
     }
 
-    public float getSleepHours() {
-        return sleepHours;
-    }
 
     public int getSquatReps() {
         return squatReps;
@@ -160,9 +157,6 @@ public class DailyActivity {
         this.waterGoal = waterGoal;
     }
 
-    public void setSleepHours(float sleepHours) {
-        this.sleepHours = sleepHours;
-    }
 
     public void setSquatReps(int squatReps) {
         this.squatReps = squatReps;
@@ -239,7 +233,6 @@ public class DailyActivity {
         map.put("timestamp", timestamp);
         map.put("waterCups", waterCups);
         map.put("waterGoal", waterGoal);
-        map.put("sleepHours", sleepHours);
         map.put("squatReps", squatReps);
         map.put("bicepCurlReps", bicepCurlReps);
         map.put("lungeReps", lungeReps);
@@ -259,7 +252,6 @@ public class DailyActivity {
         activity.timestamp = ((Number) map.getOrDefault("timestamp", 0L)).longValue();
         activity.waterCups = ((Number) map.getOrDefault("waterCups", 0)).intValue();
         activity.waterGoal = ((Number) map.getOrDefault("waterGoal", 8)).intValue();
-        activity.sleepHours = ((Number) map.getOrDefault("sleepHours", 0f)).floatValue();
         activity.squatReps = ((Number) map.getOrDefault("squatReps", 0)).intValue();
         activity.bicepCurlReps = ((Number) map.getOrDefault("bicepCurlReps", 0)).intValue();
         activity.lungeReps = ((Number) map.getOrDefault("lungeReps", 0)).intValue();

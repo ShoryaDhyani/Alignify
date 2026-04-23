@@ -122,9 +122,7 @@ public class MainActivity extends AppCompatActivity {
         cardPlank = findViewById(R.id.cardPlank);
 
         // Feedback toggles
-        voiceToggle = findViewById(R.id.voiceToggle);
         textToggle = findViewById(R.id.textToggle);
-        voiceStatus = findViewById(R.id.voiceStatus);
         textStatus = findViewById(R.id.textStatus);
 
         // Bottom navigation

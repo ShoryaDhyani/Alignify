@@ -77,10 +77,6 @@
         </LinearLayout>
 
         <!-- Center spacer for the elevated record button -->
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
 
         <!-- Analytics -->
         <LinearLayout
@@ -143,24 +139,5 @@
     </LinearLayout>
 
     <!-- Elevated center Record button (Strava-style) -->
-    <FrameLayout
-        android:id="@+id/navRun"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="0dp"
-        android:background="@drawable/bg_nav_record_button"
-        android:clickable="true"
-        android:elevation="12dp"
-        android:focusable="true">
-
-        <ImageView
-            android:id="@+id/navRunIcon"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_steps"
-            app:tint="@android:color/white" />
-    </FrameLayout>
 
 </FrameLayout>

@@ -29,7 +29,6 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 public class ExercisesFragment extends Fragment {
 
     private static final String PREFS_NAME = "AlignifyPrefs";
-    private static final String KEY_VOICE_FEEDBACK = "voice_feedback";
     private static final String KEY_TEXT_FEEDBACK = "text_feedback";
 
     private String pendingExercise = null;
@@ -41,9 +40,8 @@ public class ExercisesFragment extends Fragment {
     private CardView cardPlank;
 
     // Feedback toggles
-    private SwitchMaterial voiceToggle;
     private SwitchMaterial textToggle;
-    private TextView voiceStatus;
+
     private TextView textStatus;
 
     private final ActivityResultLauncher<String> cameraPermissionLauncher = registerForActivityResult(
@@ -90,26 +88,17 @@ public class ExercisesFragment extends Fragment {
         cardLunge = view.findViewById(R.id.cardLunge);
         cardPlank = view.findViewById(R.id.cardPlank);
 
-        voiceToggle = view.findViewById(R.id.voiceToggle);
         textToggle = view.findViewById(R.id.textToggle);
-        voiceStatus = view.findViewById(R.id.voiceStatus);
         textStatus = view.findViewById(R.id.textStatus);
     }
 
     private void setupFeedbackToggles() {
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        boolean voiceEnabled = prefs.getBoolean(KEY_VOICE_FEEDBACK, false);
         boolean textEnabled = prefs.getBoolean(KEY_TEXT_FEEDBACK, false);
 
-        voiceToggle.setChecked(voiceEnabled);
         textToggle.setChecked(textEnabled);
-        updateVoiceStatus(voiceEnabled);
         updateTextStatus(textEnabled);
 
-        voiceToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            updateVoiceStatus(isChecked);
-            saveFeedbackPreference(KEY_VOICE_FEEDBACK, isChecked);
-        });
 
         textToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             updateTextStatus(isChecked);
@@ -117,12 +106,6 @@ public class ExercisesFragment extends Fragment {
         });
     }
 
-    private void updateVoiceStatus(boolean enabled) {
-        if (voiceStatus != null) {
-            voiceStatus.setText(enabled ? "ON" : "OFF");
-            voiceStatus.setTextColor(requireContext().getColor(enabled ? R.color.accent : R.color.text_secondary_dark));
-        }
-    }
 
     private void updateTextStatus(boolean enabled) {
         if (textStatus != null) {
